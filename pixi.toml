@@ -1,0 +1,13 @@
+[workspace]
+authors = ["maxreith <max.reith@gmx.de>"]
+channels = ["conda-forge"]
+name = "the_game_simulation"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+numpy = ">=2.3.5,<3"
+pytest = ">=9.0.1,<10"
+ipykernel = ">=7.1.0,<8"
