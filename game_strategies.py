@@ -152,26 +152,21 @@ def _play_lowest_diff(player: np.ndarray, stacks: list[Stack], cards_to_play: in
         if len(player) == 0:
             break
         
-        # Cache stack tops as numpy array for vectorized operations
-        tops = np.array([s.top for s in stacks], dtype=np.int32)
+        tops = np.array([s.top for s in stacks], dtype=np.int32)  # shape (4,)
+        player_col = player.reshape(-1, 1)  # shape (n, 1)
         
-        diffs = np.empty((len(player), 4), dtype=np.int32)
-        diffs[:, 0] = tops[0] - player  # decreasing
-        diffs[:, 1] = tops[1] - player  # decreasing
-        diffs[:, 2] = player - tops[2]  # increasing
-        diffs[:, 3] = player - tops[3]  # increasing
+        diffs = tops - player_col  # shape (n, 4), gives: top - card for all
         
-        # Valid plays have positive difference (card can be placed)
-        valid_mask = diffs > 0
+        # Flip sign for increasing stacks (columns 2, 3)
+        diffs[:, 2:] = -diffs[:, 2:]  # Now: card - top for increasing
         
-        if not valid_mask.any():
+        # Mask invalid plays
+        diffs[diffs <= 0] = 1000
+        
+        if diffs.min() == 1000:
             break
         
-        # Set invalid plays to large number so they're not selected
-        diffs = np.where(diffs > 0, diffs, 1000)
-        
-        # Find minimum difference position
-        flat_idx = np.argmin(diffs)
+        flat_idx = diffs.argmin()
         best_card_idx, best_stack = divmod(flat_idx, 4)
         best_card = player[best_card_idx]
         
@@ -201,5 +196,11 @@ def strategy(player, stacks, remaining_deck):
     n_cards_to_play = 2 if len(remaining_deck) > 0 else 1
 
     new_player, new_stacks = _reset_pile(player, stacks)
+    new_player, new_stacks = _play_lowest_diff(new_player, new_stacks, n_cards_to_play - (len(player) - len(new_player)))
+    
+    if len(player) - len(new_player) < n_cards_to_play:
+        raise GameOverError(f"Player stuck with {len(new_player)} cards")
+    
+    return new_player, new_stacks
 
 
