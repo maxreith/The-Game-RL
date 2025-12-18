@@ -2,9 +2,10 @@ import numpy as np
 import pytest
 
 from game_strategies import (
-    _play_to_stack, _reset_pile, _play_lowest_diff, bonus_play_strategy, simple_game_strategy, _call_api_to_get_play_order, gemini_strategy, GameOverError,
+    _play_to_stack, _reset_pile, _play_lowest_diff, bonus_play_strategy, _call_api_to_get_play_order, gemini_strategy, GameOverError,
     DECREASING_1, DECREASING_2, INCREASING_1, INCREASING_2, Stack
 )
+
 
 
 def test_play_to_stack_plays_single_card():
@@ -141,41 +142,7 @@ def test_play_lowest_diff_with_endgame_hand():
     assert np.array_equal(actual_player, expected_player)
     assert all(np.array_equal(actual_stacks[i].to_array(), expected_stacks[i]) for i in range(4))
 
-def test_simple_game_strategy_reset_and_play():
-    stacks = [
-        Stack(99),                              # decreasing_1
-        Stack(99),                              # decreasing_2
-        Stack.from_array(np.array([1, 12])),   # increasing_1
-        Stack(1)                                # increasing_2
-    ]
-    actual_player, actual_stacks = simple_game_strategy(
-        player=np.array([2, 3, 4, 5, 6, 7]),
-        stacks=stacks,
-        remaining_deck=np.arange(2, 99)
-    )
-    expected_player = np.array([4, 5, 6, 7])
-    expected_stacks = [
-        np.array([99]),          # decreasing_1
-        np.array([99]),          # decreasing_2
-        np.array([1, 12, 2, 3]), # increasing_1
-        np.array([1])            # increasing_2
-    ]
-    assert np.array_equal(expected_player, actual_player)
-    assert all(np.array_equal(actual_stacks[i].to_array(), expected_stacks[i]) for i in range(4))
-
-def test_simple_game_strategy_game_over():
-    stacks = [
-        Stack.from_array(np.array([99, 2])),   # decreasing_1
-        Stack.from_array(np.array([99, 3])),   # decreasing_2
-        Stack.from_array(np.array([1, 97])),   # increasing_1
-        Stack.from_array(np.array([1, 98]))    # increasing_2
-    ]
-    with pytest.raises(GameOverError):
-        simple_game_strategy(
-            player=np.array([4, 5, 6, 7]),
-            stacks=stacks,
-            remaining_deck=np.arange(2, 99)
-        )
+# `simple_game_strategy` removed from codebase; related tests deleted.
 
 
 def test_bonus_play_strategy_play_wo_bonus():
@@ -279,3 +246,26 @@ def test_call_api_to_get_play_order_structure():
     for card_play in play_order.list:
         assert hasattr(card_play, 'card')
         assert hasattr(card_play, 'stack')
+
+def test_gemini_strategy_plays_reasonable():
+    stacks = [
+        Stack(99),  # decreasing_1
+        Stack(99),  # decreasing_2
+        Stack(1),   # increasing_1
+        Stack(1)    # increasing_2
+    ]
+    actual_player, actual_stacks = gemini_strategy(
+        player=np.array([2, 3]),
+        stacks=stacks,
+        remaining_deck=np.arange(2, 99)
+    )
+    expected_player = np.array([])
+    expected_stacks = [
+        np.array([99]),      # decreasing_1
+        np.array([99]),      # decreasing_2
+        np.array([1, 2, 3]), # increasing_1
+        np.array([1])        # increasing_2
+    ]
+    assert np.array_equal(actual_player, expected_player)
+    assert all(np.array_equal(actual_stacks[i].to_array(), expected_stacks[i])
+                for i in range(4))

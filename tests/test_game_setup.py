@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from game_setup import _shuffle_cards, _initiate_game, _draw_cards, run_game
-from game_strategies import simple_game_strategy, Stack
+from game_strategies import Stack
 
 
 def test_shuffle_cards_some_shuffling():
@@ -54,9 +54,3 @@ def test_draw_cards_empty_deck():
     assert np.array_equal(actual_player, expected_player)
     assert np.array_equal(actual_deck, expected_deck)
 
-def test_run_game_with_simple_strategy():
-    results = run_game(simple_game_strategy)
-    assert isinstance(results, dict)
-    assert "stacks" in results
-    # Stacks should be returned as np.ndarrays (via to_array())
-    assert all(isinstance(s, np.ndarray) for s in results["stacks"])
