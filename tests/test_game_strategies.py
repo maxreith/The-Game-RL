@@ -71,10 +71,8 @@ def test_play_to_stack_invalid_move(midgame_stacks):
 
 def test_reset_pile_with_one_reset_card(midgame_stacks):
     stacks = midgame_stacks
-    actual_player, actual_stacks = _reset_pile(
-        player=np.array([30, 31, 32, 33, 34, 35, 35]),
-        stacks=stacks
-    )
+    player=np.array([30, 31, 32, 33, 34, 35, 35])
+    actual_player, actual_stacks = _reset_pile(player, stacks)
     expected_player = np.array([31, 32, 33, 34, 35, 35])
     expected_stacks = [
         np.array([99, 70, 50]),  # decreasing_1
@@ -240,3 +238,13 @@ def test_gemini_strategy_game_over(game_over_stacks):
             stacks=stacks,
             remaining_deck=np.arange(2, 99)
         )
+
+@pytest.mark.parametrize("almost_game_over_stacks, hand", 
+                         [([4,5,98,99],np.array([2,3,15])),
+                          ([3,4,97,98],np.array([13, 7, 22, 29]))]
+                         )
+
+def test_gemini_avoid_game_over(almost_game_over_stacks, hand):
+    stacks = create_stacks(*almost_game_over_stacks)
+    actual_player, _ = gemini_strategy(hand, stacks)
+    assert len(actual_player) == len(hand) - 2 # Should play two cards to avoid game over

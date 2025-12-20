@@ -231,7 +231,7 @@ def bonus_play_strategy(player, stacks, remaining_deck, bonus_play_threshold = 4
     return player, stacks
 
 
-def gemini_strategy(player, stacks, remaining_deck):
+def gemini_strategy(player: np.ndarray, stacks: list[Stack], remaining_deck: np.ndarray = np.arange(2, 99)) -> tuple[np.ndarray, list[Stack]]:
     """Implementing a strategy that uses Gemini API to determine play order."""
     n_cards_to_play = 2 if len(remaining_deck) > 0 else 1
     play_order = _call_api_to_get_play_order(player, stacks, n_cards_to_play)
@@ -241,8 +241,8 @@ def gemini_strategy(player, stacks, remaining_deck):
             player, stacks = _play_to_stack(player, play.card, play.stack, stacks)
         except ValueError as e:
             raise GameOverError(
-                f"Gemini requested an invalid play: card={getattr(play, 'card', None)} "
-                f"stack={getattr(play, 'stack', None)}"
+                f"""Gemini requested an invalid play. Tried to play card {getattr(play, 'card', None)} on stack {getattr(play, 'stack', None)} 
+                with player hand {player} and stack tops {[s.top for s in stacks]}."""
             ) from e
 
     if len(play_order.list) < n_cards_to_play:
@@ -257,9 +257,10 @@ def _call_api_to_get_play_order(player: np.ndarray, stacks: list[Stack], n_cards
     stack_descriptions = "\n".join([f"Stack {i}: top = {stack.top}" for i, stack in enumerate(stacks)])
 
     prompt = f"""
-    You are playing the card game 'The Game'. Your hand is {player}. 
-    The current stacks and their top cards are {stack_descriptions}.\n\n You must play at least {n_cards_to_play} cards from your hand. Which cards should you play and on which stacks?\n
+    You are playing the card game 'The Game'. The rules are {rules}. Your hand is {player}. 
+    The current stacks and their top cards are {stack_descriptions}.\n\n 
     Note that decreasing piles are identified with integers 0 and 1, and increasing piles with integers 2 and 3. Thus, to play a card on the first decreasing pile, you would specify stack 0. To play on the second increasing pile, you would specify stack 3.
+    You must play at least {n_cards_to_play} cards from your hand. You must avoid invalid play, if you can. Play stack resets if possible. Which cards should you play and on which stacks?\n
     """
     class Card_Play(BaseModel):
         card: int
