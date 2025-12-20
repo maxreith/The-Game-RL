@@ -3,7 +3,7 @@ import pytest
 
 from game_strategies import (
     _play_to_stack, _reset_pile, _play_lowest_diff, bonus_play_strategy, _call_api_to_get_play_order, gemini_strategy, GameOverError,
-    DECREASING_1, DECREASING_2, INCREASING_1, INCREASING_2, Stack
+    DECREASING_1, DECREASING_2, INCREASING_1, INCREASING_2, Stack, create_stacks
 )
 
 @pytest.fixture

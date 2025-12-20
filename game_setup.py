@@ -1,6 +1,6 @@
 import numpy as np
 
-from game_strategies import GameOverError, Stack
+from game_strategies import GameOverError, Stack, bonus_play_strategy
 
 
 def _shuffle_cards_custom(card_deck: np.ndarray = None, n_shuffles: int = 200) -> np.ndarray:
@@ -90,9 +90,11 @@ def run_simulation(strategy, n_games: int = 100, n_players: int = 3, bonus_play_
     """Run multiple games and collect data."""
     victories = []
     losses = []
-    import pdbp; breakpoint()
     for _ in range(n_games):
-        result = run_game(strategy, n_players=n_players, bonus_play_threshold=bonus_play_threshold) #TODO: some strategies don't take bonus_play_threshold as an argument
+        if strategy == bonus_play_strategy:
+            result = run_game(strategy, n_players=n_players, bonus_play_threshold=bonus_play_threshold)
+        else:
+            result = run_game(strategy, n_players=n_players)
         
         if result["victory"]:
             victories.append(result)

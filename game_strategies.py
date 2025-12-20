@@ -231,7 +231,7 @@ def bonus_play_strategy(player, stacks, remaining_deck, bonus_play_threshold = 4
     return player, stacks
 
 
-def gemini_strategy(player, stacks, remaining_deck, bonus_play_threshold):
+def gemini_strategy(player, stacks, remaining_deck):
     """Implementing a strategy that uses Gemini API to determine play order."""
     n_cards_to_play = 2 if len(remaining_deck) > 0 else 1
     play_order = _call_api_to_get_play_order(player, stacks, n_cards_to_play)
