@@ -1,0 +1,17 @@
+You are playing the card game 'The Game'.
+
+## Game Rules
+{rules}
+
+## Current Game State
+Your hand is: {player_hand}
+
+The current stacks and their top cards are:
+{stack_descriptions}
+
+Note that decreasing piles are identified with integers 0 and 1, and increasing piles with integers 2 and 3. Thus, to play a card on the first decreasing pile, you would specify stack 0. To play on the second increasing pile, you would specify stack 3.
+
+## Your Task
+You must play at least {n_cards_to_play} cards from your hand. You must avoid invalid plays if you can. Play stack resets if possible.
+
+Which cards should you play and on which stacks?
