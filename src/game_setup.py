@@ -72,8 +72,14 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
         A dict with victory status, final stacks, and cards remaining.
     """
     hand_size = 6 if n_players > 2 else 7
-    shuffled_deck = _shuffle_cards_custom(n_shuffles=n_shuffles) if use_custom_shuffle else _shuffle_cards(n_shuffles=n_shuffles)
-    players, remaining_deck, stacks = _initiate_game(n_players, shuffled_deck, hand_size)
+    shuffled_deck = (
+        _shuffle_cards_custom(n_shuffles=n_shuffles)
+        if use_custom_shuffle
+        else _shuffle_cards(n_shuffles=n_shuffles)
+    )
+    players, remaining_deck, stacks = _initiate_game(
+        n_players, shuffled_deck, hand_size
+    )
 
     turn = 0
 
@@ -105,7 +111,9 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
         }
 
 
-def run_simulation(strategy, n_games=100, n_players=3, n_shuffles=200, use_custom_shuffle=False):
+def run_simulation(
+    strategy, n_games=100, n_players=3, n_shuffles=200, use_custom_shuffle=False
+):
     """Run multiple games and collect data.
 
     Args:
