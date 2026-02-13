@@ -8,7 +8,7 @@ from game_setup import run_simulation
 from game_strategies import bonus_play_strategy
 
 
-def generate_simulation_results(n_games: int = 500, output_path: str = 'simulation_results.parquet'):
+def generate_simulation_results(n_games: int = 1000, output_path: str = 'simulation_results.parquet'):
     """
     Test different parameter combinations and save results to parquet.
 
@@ -17,7 +17,7 @@ def generate_simulation_results(n_games: int = 500, output_path: str = 'simulati
         output_path: Path to save the parquet file
     """
     # Define parameter grid
-    n_players_options = [2, 3, 4]
+    n_players_options = [2, 3, 4, 5, 6]
     bonus_play_threshold_options = [1, 2, 3, 4, 5, 6, 7, 8]
 
     results = []
