@@ -58,7 +58,7 @@ def plot_shuffle_evaluation(
         f"(n_players={optimal_params['n_players']}, "
         f"bonus_play_threshold={optimal_params['bonus_play_threshold']})"
     )
-    ax.set_xscale("log")
+    # ax.set_xscale("log")
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()

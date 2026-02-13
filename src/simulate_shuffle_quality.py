@@ -49,7 +49,7 @@ def evaluate_shuffle_qualities(optimal_params: dict, n_games: int = 100):
         pandas.DataFrame: Results for each shuffle quality
     """
     # Test different shuffle qualities
-    shuffle_qualities = [1, 2, 5, 10, 20, 50, 100, 200]
+    shuffle_qualities = [1, 2, 5, 10, 15, 25, 50, 75, 100, 200]
     results = []
 
     for n_shuffles in shuffle_qualities:

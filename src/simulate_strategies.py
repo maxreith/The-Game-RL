@@ -106,8 +106,6 @@ def main():
 
     df = pd.DataFrame(all_results)
     df.to_parquet(bld_dir / "simulation_results.parquet", index=False)
-    print(f"\nResults saved to {bld_dir / 'simulation_results.parquet'}")
-    print(df)
 
 
 if __name__ == "__main__":
