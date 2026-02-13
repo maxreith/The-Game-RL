@@ -40,10 +40,24 @@ def _identify_min_distance_card(player, stacks):
     return best_card, best_stack, min_diff
 
 
-def gemini_strategy(player, stacks, remaining_deck=np.arange(2, 99)):
-    """Implementing a strategy that uses Gemini API to determine play order."""
+def gemini_strategy(
+    player, stacks, remaining_deck=np.arange(2, 99), thinking_level="minimal"
+):
+    """Implementing a strategy that uses Gemini API to determine play order.
+
+    Args:
+        player: Array of cards in player's hand.
+        stacks: List of Stack objects representing game stacks.
+        remaining_deck: Cards remaining in the deck.
+        thinking_level: Gemini thinking level ("minimal", "low", "medium", "high").
+
+    Returns:
+        Tuple of (updated player hand, updated stacks).
+    """
     n_cards_to_play = 2 if len(remaining_deck) > 0 else 1
-    play_order = _call_api_to_get_play_order(player, stacks, n_cards_to_play)
+    play_order = _call_api_to_get_play_order(
+        player, stacks, n_cards_to_play, thinking_level
+    )
 
     for play in play_order.list:
         try:

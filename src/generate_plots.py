@@ -79,6 +79,41 @@ def find_optimal_parameters(df: pd.DataFrame) -> dict:
     return df.loc[best_idx, ["n_players", "bonus_play_threshold"]].to_dict()
 
 
+def plot_gemini_thinking(df: pd.DataFrame, output_path: str) -> None:
+    """Create bar plot of average turns by thinking level with error bars.
+
+    Args:
+        df: DataFrame with columns thinking_level, turns.
+        output_path: Path to save the plot.
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    stats = df.groupby("thinking_level")["turns"].agg(["mean", "std"]).reset_index()
+    level_order = ["minimal", "low", "medium", "high"]
+    stats["order"] = stats["thinking_level"].apply(
+        lambda x: level_order.index(x) if x in level_order else len(level_order)
+    )
+    stats = stats.sort_values("order")
+
+    ax.bar(
+        stats["thinking_level"],
+        stats["mean"],
+        yerr=stats["std"],
+        capsize=5,
+        color="steelblue",
+        edgecolor="black",
+    )
+
+    ax.set_xlabel("Thinking Level")
+    ax.set_ylabel("Average Turns")
+    ax.set_title("Gemini Thinking Level: Average Turns Until Game Over")
+    ax.grid(True, alpha=0.3, axis="y")
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     """Load data and generate plots."""
     sim_results = pd.read_parquet("bld/simulation_results.parquet")

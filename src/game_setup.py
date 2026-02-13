@@ -100,6 +100,7 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
             "victory": True,
             "stacks": [s.to_array() for s in stacks],
             "cards_remaining": 0,
+            "turns": turn,
         }
 
     except GameOverError:
@@ -108,6 +109,7 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
             "victory": False,
             "stacks": [s.to_array() for s in stacks],
             "cards_remaining": cards_remaining,
+            "turns": turn,
         }
 
 

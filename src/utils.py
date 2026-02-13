@@ -176,8 +176,20 @@ def _build_stack_description(stack_idx, top_value):
     return f"Stack {stack_idx} ({direction}): top={top_value} → Valid plays: {valid_range} {reset_note}".strip()
 
 
-def _call_api_to_get_play_order(player, stacks, n_cards_to_play):
-    """Get play order from Gemini API."""
+def _call_api_to_get_play_order(
+    player, stacks, n_cards_to_play, thinking_level="minimal"
+):
+    """Get play order from Gemini API.
+
+    Args:
+        player: Array of cards in player's hand.
+        stacks: List of Stack objects representing game stacks.
+        n_cards_to_play: Minimum number of cards to play this turn.
+        thinking_level: Gemini thinking level ("minimal", "low", "medium", "high").
+
+    Returns:
+        PlayOrder object with list of card plays.
+    """
     stack_descriptions = "\n".join(
         [_build_stack_description(i, stack.top) for i, stack in enumerate(stacks)]
     )
@@ -198,7 +210,7 @@ def _call_api_to_get_play_order(player, stacks, n_cards_to_play):
         model=GEMINI_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+            thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
             response_mime_type="application/json",
             response_json_schema=PlayOrder.model_json_schema(),
         ),
