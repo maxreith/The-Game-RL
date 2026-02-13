@@ -101,12 +101,12 @@ def main():
     param_combinations = build_param_grid(strategy_variants, n_players_list, n_games)
     all_results = run_all_simulations(param_combinations)
 
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
+    bld_dir = Path("bld")
+    bld_dir.mkdir(exist_ok=True)
 
     df = pd.DataFrame(all_results)
-    df.to_parquet(output_dir / "simulation_results.parquet", index=False)
-    print(f"\nResults saved to {output_dir / 'simulation_results.parquet'}")
+    df.to_parquet(bld_dir / "simulation_results.parquet", index=False)
+    print(f"\nResults saved to {bld_dir / 'simulation_results.parquet'}")
     print(df)
 
 

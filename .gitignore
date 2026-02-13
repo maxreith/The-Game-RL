@@ -9,6 +9,14 @@ __pycache__/
 # pytest cache
 .pytest_cache/
 
+# Linter cache
+.ruff_cache/
+
+# Build outputs
+bld/
+plots/
+*.parquet
+
 # Other
 /notebooks
 .env
