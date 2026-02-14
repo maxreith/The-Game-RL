@@ -22,6 +22,14 @@ def task_evaluate_shuffle_quality(
     subprocess.run(["python", code], check=True)
 
 
+def task_run_gemini_simulation(
+    code: Path = SRC / "simulate_gemini_thinking.py",
+    produces: Path = BLD / "gemini_thinking_results.parquet",
+):
+    """Runs the Gemini thinking level simulations."""
+    subprocess.run(["python", code], check=True)
+
+
 def task_generate_plots(
     code: Path = SRC / "generate_plots.py",
     depends: list = [
