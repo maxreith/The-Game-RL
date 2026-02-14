@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from game_setup import run_simulation
-from strategies import bonus_play_strategy, gemini_strategy
+from strategies import bonus_play_strategy
 
 
 def build_strategy_variants():
@@ -26,7 +26,6 @@ def build_strategy_variants():
                 "func": partial(bonus_play_strategy, bonus_play_threshold=threshold),
             }
         )
-    variants.append({"name": "gemini", "func": gemini_strategy})
     return variants
 
 
