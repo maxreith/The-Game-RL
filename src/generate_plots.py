@@ -81,7 +81,7 @@ def find_optimal_parameters(df: pd.DataFrame) -> dict:
 
 
 def plot_gemini_thinking(df: pd.DataFrame, output_path: str) -> None:
-    """Create bar plot of average turns by thinking level with error bars.
+    """Create bar plot of average turns by thinking level.
 
     Args:
         df: DataFrame with columns thinking_level, turns.
@@ -89,7 +89,7 @@ def plot_gemini_thinking(df: pd.DataFrame, output_path: str) -> None:
     """
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    stats = df.groupby("thinking_level")["turns"].agg(["mean", "std"]).reset_index()
+    stats = df.groupby("thinking_level")["turns"].mean().reset_index()
     level_order = ["minimal", "low", "medium", "high"]
     stats["order"] = stats["thinking_level"].apply(
         lambda x: level_order.index(x) if x in level_order else len(level_order)
@@ -98,9 +98,7 @@ def plot_gemini_thinking(df: pd.DataFrame, output_path: str) -> None:
 
     ax.bar(
         stats["thinking_level"],
-        stats["mean"],
-        yerr=stats["std"],
-        capsize=5,
+        stats["turns"],
         color="steelblue",
         edgecolor="black",
     )
