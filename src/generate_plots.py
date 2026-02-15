@@ -27,10 +27,18 @@ def plot_strategy_evaluation(df: pd.DataFrame, output_path: str) -> None:
 
     ax.set_xlabel("Number of Players")
     ax.set_ylabel("Win Rate")
-    ax.set_title("Strategy Evaluation: Win Rate by Number of Players")
-    ax.legend(title="Bonus Play Threshold", bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.set_title(
+        "Strategy Evaluation: Win Rate by Number of Players", fontweight="bold"
+    )
+    ax.legend(
+        title="Bonus Play Threshold",
+        bbox_to_anchor=(1.02, 1),
+        loc="upper left",
+        frameon=False,
+    )
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-    ax.grid(True, alpha=0.3)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
@@ -56,11 +64,12 @@ def plot_shuffle_evaluation(
     ax.set_ylabel("Win Rate")
     ax.set_title(
         f"Shuffle Quality Evaluation\n"
-        f"(n_players={optimal_params['n_players']}, "
-        f"bonus_play_threshold={optimal_params['bonus_play_threshold']})"
+        f"({optimal_params['n_players']} players, "
+        f"bonus play threshold {optimal_params['bonus_play_threshold']})",
+        fontweight="bold",
     )
-    # ax.set_xscale("log")
-    ax.grid(True, alpha=0.3)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
@@ -100,13 +109,16 @@ def plot_gemini_thinking(df: pd.DataFrame, output_path: str) -> None:
         stats["thinking_level"],
         stats["turns"],
         color="steelblue",
-        edgecolor="black",
+        edgecolor="none",
     )
 
     ax.set_xlabel("Thinking Level")
     ax.set_ylabel("Average Turns")
-    ax.set_title("Gemini Thinking Level: Average Turns Until Game Over")
-    ax.grid(True, alpha=0.3, axis="y")
+    ax.set_title(
+        "Gemini Thinking Level: Average Turns Until Game Over", fontweight="bold"
+    )
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
