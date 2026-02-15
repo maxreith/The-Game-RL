@@ -1,6 +1,5 @@
 # pixi environments
-.pixi/*
-!.pixi/config.toml
+.pixi/
 
 # Python bytecode
 __pycache__/
@@ -13,7 +12,6 @@ __pycache__/
 .ruff_cache/
 
 # Build outputs
-plots/
 *.parquet
 
 # Other
