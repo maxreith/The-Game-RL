@@ -35,8 +35,13 @@ def task_generate_plots(
     depends: list = [
         BLD / "simulation_results.parquet",
         BLD / "shuffle_quality_results.parquet",
+        BLD / "gemini_thinking_results.parquet",
     ],
-    produces: list = [BLD / "strategy_evaluation.png", BLD / "shuffle_evaluation.png"],
+    produces: list = [
+        BLD / "strategy_evaluation.png",
+        BLD / "shuffle_evaluation.png",
+        BLD / "gemini_thinking.png",
+    ],
 ):
     """Generates visualization plots from simulation results."""
     subprocess.run(["pixi", "run", "python", code], check=True)
