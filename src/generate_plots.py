@@ -29,6 +29,7 @@ def plot_strategy_evaluation(df: pd.DataFrame, output_path: str) -> None:
     ax.set_ylabel("Win Rate")
     ax.set_title("Strategy Evaluation: Win Rate by Number of Players")
     ax.legend(title="Bonus Play Threshold", bbox_to_anchor=(1.02, 1), loc="upper left")
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
