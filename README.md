@@ -13,46 +13,51 @@ where players work together to play all 98 cards onto four shared stacks.
 - Each turn: play at least 2 cards (or 1 if deck is empty), then draw back to hand size
 - Win condition: all cards played; lose condition: cannot make a legal play
 
-## Results
+## Analysis
 
-### Strategy Evaluation
+### Which strategy works best? And what is the optimal number of players?
 
 The simulation tests a "bonus play" strategy that plays additional cards beyond the
 minimum required when a card is within a threshold distance from a stack top. Lower
-thresholds mean more aggressive extra plays.
+thresholds mean more aggressive extra plays. I ran 10,000 simulations for each
+combination of player count and bonus play threshold.
 
 ![Strategy Evaluation](bld/strategy_evaluation.png)
 
-**Key findings:**
+**Findings:**
 
-- Threshold 2 performs best across most player counts
-- Win rates peak at 5 players (~5%)
-- More conservative strategies (higher thresholds) underperform
+- Threshold 2 or 3 performs best across most player counts
+- Win rates peak at only 5 percent
+- 5 players seems optimal
 
-### Shuffle Quality Impact
+### Does it matter how well the deck is shuffled?
 
-Using a custom cut-based shuffle algorithm, we measure how shuffle quality affects win
-rates.
+I used to disagree with my office mates over how well we'd have to shuffle the deck
+before setting up a new game. Using a custom cut-based shuffle algorithm, I simulate how
+shuffle quality affects win rates. I ran 1,000 games per shuffle quality, using the
+optimal settings (5 players, bonus play threshold of 2).
 
 ![Shuffle Quality Evaluation](bld/shuffle_evaluation.png)
 
-**Key findings:**
+**Findings:**
 
-- Poorly shuffled decks (few shuffles) dramatically increase win rates
+- Poorly shuffled decks have dramatically higher win rates
 - With proper shuffling (50+ iterations), win rates stabilize around 5%
-- This demonstrates the game's difficulty depends heavily on card distribution
 
-### Gemini AI Thinking Levels
+### Can AI play this game?
 
-We test Google's Gemini model at different thinking levels as a game-playing agent.
+The answer is no. I wanted to test Gemini 3 on this, but couldn't get it to win a single
+game. It keeps making invalid moves. I guess there is no training data for this game.
+But does Gemini at least perform better when you increase the thinking level? The plot
+below shows the average turn at which Gemini lost, for various thinking levels. I ran 3
+games per thinking level (because compute is not free, and high thinking is slow).
 
 ![Gemini Thinking Levels](bld/gemini_thinking.png)
 
-**Key findings:**
+**Findings:**
 
-- Higher thinking levels survive more turns before making invalid moves
-- Medium and high thinking levels show similar performance
-- Even with extended thinking, the AI struggles with the game's strategic depth
+- Higher thinking levels survive more turns
+- Even with extended thinking, the AI struggles with the game
 
 ## Installation
 
@@ -105,7 +110,3 @@ For Gemini simulations, set your API key in `.env`:
 ```
 GEMINI_API_KEY=your_key_here
 ```
-
-## License
-
-MIT
