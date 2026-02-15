@@ -1,6 +1,5 @@
 """Simulate games with varying Gemini thinking levels."""
 
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 
@@ -11,8 +10,8 @@ from strategies import gemini_strategy
 
 pd.options.future.infer_string = True
 
-THINKING_LEVELS = ["minimal", "low", "medium"]
-N_GAMES_PER_LEVEL = 1
+THINKING_LEVELS = ["minimal", "low", "medium", "high"]
+N_GAMES_PER_LEVEL = 3
 
 
 def _run_single_game(level: str, game_num: int) -> dict:
@@ -87,19 +86,9 @@ def run_thinking_level_simulation(
 
 def main() -> None:
     """Run simulation and save results."""
-    start_time = time.time()
-
     df = run_thinking_level_simulation()
 
-    elapsed_time = time.time() - start_time
-    elapsed_minutes = elapsed_time / 60
-
     df.to_parquet("bld/gemini_thinking_results.parquet")
-    print("\nSaved results to bld/gemini_thinking_results.parquet")
-    print(
-        f"Total simulation time: {elapsed_minutes:.1f} minutes ({elapsed_time:.1f} seconds)"
-    )
-    print(df)
 
 
 if __name__ == "__main__":
