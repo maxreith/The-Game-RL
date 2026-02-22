@@ -12,6 +12,7 @@ __pycache__/
 .ruff_cache/
 
 # Build outputs
+bld/
 *.parquet
 
 # Other
