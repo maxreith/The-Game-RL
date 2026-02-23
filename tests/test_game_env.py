@@ -24,9 +24,10 @@ class TestTheGameEnv:
         assert env.action_space.n == 29  # 7*4 + 1
 
     def test_observation_space_shape(self):
-        """Observation includes hand, stacks, deck, cards_played, min_required."""
+        """Observation includes hand, stacks, gaps, deck, cards_played, min_required."""
         env = TheGameEnv(n_players=3, hand_size=6)
-        assert env.observation_space.shape == (13,)  # 6 + 4 + 1 + 1 + 1
+        # 6 hand + 4 stack tops + 4 stack gaps + 1 deck + 1 cards_played + 1 min_required
+        assert env.observation_space.shape == (17,)
 
     def test_reset_returns_valid_observation(self):
         """Reset returns observation within bounds."""
@@ -59,7 +60,7 @@ class TestTheGameEnv:
 
     def test_valid_action_gives_positive_reward(self):
         """Playing a valid card gives positive reward."""
-        env = TheGameEnv()
+        env = TheGameEnv(distance_penalty_scale=0)
         env.reset(seed=42)
         mask = env.action_masks()
         valid_action = np.where(mask)[0][0]
@@ -83,20 +84,24 @@ class TestTheGameEnv:
         """Observation shows cards played this turn increasing."""
         env = TheGameEnv()
         obs, _ = env.reset(seed=42)
-        cards_played_idx = env.hand_size + 4 + 1  # Position in obs
+        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) = 15
+        cards_played_idx = env.hand_size + 4 + 4 + 1
         assert obs[cards_played_idx] == 0
 
         mask = env.action_masks()
         action = np.where(mask)[0][0]
         obs, _, _, _, _ = env.step(action)
-        assert obs[cards_played_idx] == 1
+        # Normalized: 1 card / hand_size
+        assert obs[cards_played_idx] == pytest.approx(1.0 / env.hand_size, abs=0.01)
 
     def test_minimum_cards_required_in_observation(self):
         """Observation includes min cards required (2 if deck, 1 if empty)."""
         env = TheGameEnv()
         obs, _ = env.reset(seed=42)
-        min_required_idx = env.hand_size + 4 + 2
-        assert obs[min_required_idx] == 2  # Deck exists at start
+        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) + cards_played (1) = 16
+        min_required_idx = env.hand_size + 4 + 4 + 2
+        # Normalized: (min_required - 1), so 2 -> 1.0
+        assert obs[min_required_idx] == 1.0  # Deck exists at start
 
 
 class TestGameMechanics:
@@ -172,7 +177,9 @@ class TestRewardStructure:
 
     def test_reward_per_card_configurable(self):
         """Custom reward_per_card is applied."""
-        env = TheGameEnv(reward_per_card=0.5)
+        env = TheGameEnv(
+            reward_per_card=0.5, trick_play_reward=0, distance_penalty_scale=0
+        )
         env.reset(seed=42)
         mask = env.action_masks()
         action = np.where(mask)[0][0]
@@ -189,6 +196,112 @@ class TestRewardStructure:
         """Loss penalty is subtracted from reward on game over."""
         env = TheGameEnv(reward_per_card=0.1, loss_penalty=5.0)
         assert env.loss_penalty == 5.0
+
+    def test_trick_play_reward_on_increasing_stack(self):
+        """Backwards trick on increasing stack gives bonus reward."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+        )
+        env.reset(seed=42)
+
+        env.stacks[2] = Stack.from_array([1, 50])
+        env.hands[0] = np.array([40, 55, 60, 65, 70, 75], dtype=np.int32)
+
+        action = 0 * 4 + 2
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        assert reward == pytest.approx(0.11, abs=0.001)
+
+    def test_trick_play_reward_on_decreasing_stack(self):
+        """Backwards trick on decreasing stack gives bonus reward."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+        )
+        env.reset(seed=42)
+
+        env.stacks[0] = Stack.from_array([99, 50])
+        env.hands[0] = np.array([60, 45, 40, 35, 30, 25], dtype=np.int32)
+
+        action = 0 * 4 + 0
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        assert reward == pytest.approx(0.11, abs=0.001)
+
+    def test_no_distance_penalty_within_threshold(self):
+        """Distance <= 5 has no penalty."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.01
+        )
+        env.reset(seed=42)
+
+        env.stacks[2] = Stack.from_array([1, 30])
+        env.hands[0] = np.array([35, 40, 45, 50, 55, 60], dtype=np.int32)
+
+        action = 0 * 4 + 2
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        # distance=5, no penalty
+        assert reward == pytest.approx(0.01, abs=0.001)
+
+    def test_quadratic_distance_penalty(self):
+        """Distance > 5 gets quadratic penalty."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.01
+        )
+        env.reset(seed=42)
+
+        env.stacks[2] = Stack.from_array([1, 30])
+        env.hands[0] = np.array([40, 45, 50, 55, 60, 65], dtype=np.int32)
+
+        action = 0 * 4 + 2
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        # distance=10, penalty = 0.01 * (10-5)^2 = 0.01 * 25 = 0.25
+        assert reward == pytest.approx(0.01 - 0.25, abs=0.001)
+
+    def test_quadratic_penalty_scales_with_distance(self):
+        """Larger distances get much larger penalties."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.001
+        )
+        env.reset(seed=42)
+
+        env.stacks[2] = Stack.from_array([1, 10])
+        env.hands[0] = np.array([35, 40, 45, 50, 55, 60], dtype=np.int32)
+
+        action = 0 * 4 + 2
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        # distance=25, penalty = 0.001 * (25-5)^2 = 0.001 * 400 = 0.4
+        assert reward == pytest.approx(0.01 - 0.4, abs=0.001)
+
+    def test_no_trick_reward_for_forward_plays(self):
+        """Normal plays (not backwards trick) don't get trick bonus."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+        )
+        env.reset(seed=42)
+
+        env.stacks[2] = Stack.from_array([1, 30])
+        env.hands[0] = np.array([40, 45, 50, 55, 60, 65], dtype=np.int32)
+
+        action = 0 * 4 + 2
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        # Not a backwards trick (40 > 30, normal forward play on increasing stack)
+        assert reward == pytest.approx(0.01, abs=0.001)
 
 
 class TestMultiPlayer:

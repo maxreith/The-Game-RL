@@ -24,6 +24,8 @@ class TheGameEnv(gym.Env):
         reward_per_card: Reward for each successfully played card.
         win_reward: Bonus reward for winning the game.
         loss_penalty: Penalty for losing the game.
+        trick_play_reward: Bonus for backwards trick plays (±10 reset cards).
+        distance_reward_scale: Scale for distance-based reward shaping.
     """
 
     metadata = {"render_modes": ["human"]}
@@ -35,6 +37,9 @@ class TheGameEnv(gym.Env):
         reward_per_card=0.01,
         win_reward=1.0,
         loss_penalty=0.5,
+        trick_play_reward=0.1,
+        distance_penalty_scale=0.001,
+        progress_reward_scale=0.0,
     ):
         super().__init__()
         self.n_players = n_players
@@ -42,17 +47,21 @@ class TheGameEnv(gym.Env):
         self.reward_per_card = reward_per_card
         self.win_reward = win_reward
         self.loss_penalty = loss_penalty
+        self.trick_play_reward = trick_play_reward
+        self.distance_penalty_scale = distance_penalty_scale
+        self.progress_reward_scale = progress_reward_scale
 
         # Action: card_index * 4 + stack_index, plus one "end turn" action
         # card_index in [0, hand_size-1], stack_index in [0, 3]
         # Last action (hand_size * 4) = end turn
         self.action_space = spaces.Discrete(self.hand_size * 4 + 1)
 
-        # Observation: [hand (hand_size), stack_tops (4), deck_remaining (1),
-        #               cards_played_this_turn (1), min_cards_required (1)]
-        obs_size = self.hand_size + 4 + 3
+        # Observation: [hand (hand_size), stack_tops (4), stack_gaps (4),
+        #               deck_remaining (1), cards_played_this_turn (1), min_cards_required (1)]
+        # All values normalized to [0, 1] range
+        obs_size = self.hand_size + 4 + 4 + 3
         self.observation_space = spaces.Box(
-            low=0, high=100, shape=(obs_size,), dtype=np.float32
+            low=0, high=1.0, shape=(obs_size,), dtype=np.float32
         )
 
         self._reset_game_state()
@@ -65,6 +74,8 @@ class TheGameEnv(gym.Env):
         self.current_player_idx = 0
         self.cards_played_this_turn = 0
         self.total_cards_played = 0
+        self.total_turns = 0
+        self.total_distance = 0
 
     def _shuffle_and_deal(self, seed=None):
         """Shuffle deck and deal cards to all players."""
@@ -90,20 +101,50 @@ class TheGameEnv(gym.Env):
         ]
 
     def _get_observation(self):
-        """Build observation array from current player's perspective."""
+        """Build observation array from current player's perspective.
+
+        All values normalized to [0, 1] range for better learning.
+        """
         hand = self.hands[self.current_player_idx]
 
-        # Pad hand to fixed size (0 = empty slot)
+        # Pad hand to fixed size and normalize (0 = empty slot, cards 2-99)
         hand_obs = np.zeros(self.hand_size, dtype=np.float32)
-        hand_obs[: len(hand)] = hand
+        hand_obs[: len(hand)] = hand / 100.0  # Normalize to [0, 1]
 
-        stack_tops = np.array([s.top for s in self.stacks], dtype=np.float32)
-        deck_remaining = np.array([len(self.remaining_deck)], dtype=np.float32)
-        cards_played = np.array([self.cards_played_this_turn], dtype=np.float32)
-        min_required = np.array([self._min_cards_required()], dtype=np.float32)
+        # Stack tops normalized
+        stack_tops = np.array([s.top / 100.0 for s in self.stacks], dtype=np.float32)
+
+        # Stack gaps: how much room is left on each stack (normalized to [0, 1])
+        # Decreasing stacks (0,1): gap = top - 2 (range: 0 to 97)
+        # Increasing stacks (2,3): gap = 99 - top (range: 0 to 98)
+        gaps = np.array(
+            [
+                min((self.stacks[0].top - 2) / 97.0, 1.0),  # Dec 1
+                min((self.stacks[1].top - 2) / 97.0, 1.0),  # Dec 2
+                min((99 - self.stacks[2].top) / 98.0, 1.0),  # Inc 1
+                min((99 - self.stacks[3].top) / 98.0, 1.0),  # Inc 2
+            ],
+            dtype=np.float32,
+        )
+
+        # Deck size normalized (max 98 - n_players * hand_size)
+        max_deck = 98 - self.n_players * self.hand_size
+        deck_remaining = np.array(
+            [min(len(self.remaining_deck) / max(max_deck, 1), 1.0)], dtype=np.float32
+        )
+
+        # Cards played this turn normalized (max is hand_size)
+        cards_played = np.array(
+            [self.cards_played_this_turn / self.hand_size], dtype=np.float32
+        )
+
+        # Min required normalized (1 or 2)
+        min_required = np.array(
+            [(self._min_cards_required() - 1)], dtype=np.float32
+        )  # 0 or 1
 
         return np.concatenate(
-            [hand_obs, stack_tops, deck_remaining, cards_played, min_required]
+            [hand_obs, stack_tops, gaps, deck_remaining, cards_played, min_required]
         )
 
     def _min_cards_required(self):
@@ -168,6 +209,24 @@ class TheGameEnv(gym.Env):
 
         self.current_player_idx = (self.current_player_idx + 1) % self.n_players
         self.cards_played_this_turn = 0
+        self.total_turns += 1
+
+    def _get_episode_stats(self):
+        """Return statistics for the completed episode."""
+        avg_cards_per_turn = (
+            self.total_cards_played / self.total_turns if self.total_turns > 0 else 0
+        )
+        avg_distance = (
+            self.total_distance / self.total_cards_played
+            if self.total_cards_played > 0
+            else 0
+        )
+        return {
+            "total_cards_played": self.total_cards_played,
+            "total_turns": self.total_turns,
+            "avg_cards_per_turn": avg_cards_per_turn,
+            "avg_distance": avg_distance,
+        }
 
     def _check_game_over(self):
         """Check if game is won or lost."""
@@ -199,6 +258,8 @@ class TheGameEnv(gym.Env):
         self.current_player_idx = 0
         self.cards_played_this_turn = 0
         self.total_cards_played = 0
+        self.total_turns = 0
+        self.total_distance = 0
 
         return self._get_observation(), {"action_mask": self.action_masks()}
 
@@ -221,18 +282,24 @@ class TheGameEnv(gym.Env):
         # Handle end turn action
         if action == end_turn_action:
             if self.cards_played_this_turn < self._min_cards_required():
-                return self._get_observation(), -1.0, True, False, {"invalid": True}
+                info = {"invalid": True, **self._get_episode_stats()}
+                return self._get_observation(), -1.0, True, False, info
 
             self._end_turn()
 
             # Check if next player can play
             if not np.any(self.action_masks()):
+                info = {"victory": False, "reason": "next_player_stuck"}
+                info.update(self._get_episode_stats())
+                progress_bonus = self.progress_reward_scale * (
+                    self.total_cards_played / 98
+                )
                 return (
                     self._get_observation(),
-                    -self.loss_penalty,
+                    -self.loss_penalty + progress_bonus,
                     True,
                     False,
-                    {"victory": False, "reason": "next_player_stuck"},
+                    info,
                 )
 
             return (
@@ -248,34 +315,54 @@ class TheGameEnv(gym.Env):
 
         # Validate action
         if card_idx >= len(hand):
-            return self._get_observation(), -1.0, True, False, {"invalid": True}
+            info = {"invalid": True, **self._get_episode_stats()}
+            return self._get_observation(), -1.0, True, False, info
 
         card = hand[card_idx]
 
         if not self._is_valid_play(card, stack_idx):
-            return self._get_observation(), -1.0, True, False, {"invalid": True}
+            info = {"invalid": True, **self._get_episode_stats()}
+            return self._get_observation(), -1.0, True, False, info
 
         # Execute the play using existing utility
         try:
+            stack_top = self.stacks[stack_idx].top
+            distance = abs(card - stack_top)
             new_hand, new_stacks = _play_to_stack(hand, card, stack_idx, self.stacks)
             self.hands[self.current_player_idx] = new_hand
             self.stacks = new_stacks
             self.cards_played_this_turn += 1
             self.total_cards_played += 1
+            self.total_distance += distance
         except ValueError:
-            return self._get_observation(), -1.0, True, False, {"invalid": True}
+            info = {"invalid": True, **self._get_episode_stats()}
+            return self._get_observation(), -1.0, True, False, info
 
         reward = self.reward_per_card
+
+        # Bonus for BACKWARDS trick play (reset card going against stack direction)
+        # Increasing stack (idx >= 2): trick = card + 10 == stack_top (card is 10 BELOW)
+        # Decreasing stack (idx < 2): trick = card - 10 == stack_top (card is 10 ABOVE)
+        is_trick_play = (stack_idx >= 2 and card + 10 == stack_top) or (
+            stack_idx < 2 and card - 10 == stack_top
+        )
+        if is_trick_play:
+            reward += self.trick_play_reward
+
+        # Quadratic penalty for distance > 5
+        if distance > 5:
+            reward -= self.distance_penalty_scale * (distance - 5) ** 2
 
         # Check for victory
         total_cards = len(self.remaining_deck) + sum(len(h) for h in self.hands)
         if total_cards == 0:
+            info = {"victory": True, **self._get_episode_stats()}
             return (
                 self._get_observation(),
                 reward + self.win_reward,
                 True,
                 False,
-                {"victory": True, "total_cards_played": self.total_cards_played},
+                info,
             )
 
         # Check if turn must end (no more cards or no valid plays)
@@ -286,23 +373,33 @@ class TheGameEnv(gym.Env):
 
         if must_end_turn:
             if self.cards_played_this_turn < self._min_cards_required():
+                info = {"victory": False, "reason": "cannot_play_minimum"}
+                info.update(self._get_episode_stats())
+                progress_bonus = self.progress_reward_scale * (
+                    self.total_cards_played / 98
+                )
                 return (
                     self._get_observation(),
-                    reward - self.loss_penalty,
+                    reward - self.loss_penalty + progress_bonus,
                     True,
                     False,
-                    {"victory": False, "reason": "cannot_play_minimum"},
+                    info,
                 )
             self._end_turn()
 
             # After ending turn, check if next player can play
             if not np.any(self.action_masks()):
+                info = {"victory": False, "reason": "next_player_stuck"}
+                info.update(self._get_episode_stats())
+                progress_bonus = self.progress_reward_scale * (
+                    self.total_cards_played / 98
+                )
                 return (
                     self._get_observation(),
-                    reward - self.loss_penalty,
+                    reward - self.loss_penalty + progress_bonus,
                     True,
                     False,
-                    {"victory": False, "reason": "next_player_stuck"},
+                    info,
                 )
 
         return (
