@@ -247,6 +247,52 @@ stack_health, phase_multiplier).
   distance penalty causes poor play
 - Distance penalty improves card count significantly
 
+### Extended Training: trick_and_distance at 2M steps
+
+Best config from grid search trained for 2M steps (vs 300k).
+
+**Configuration:**
+
+```python
+TheGameEnv(
+    n_players=5,
+    reward_per_card=0.05,
+    win_reward=10.0,
+    loss_penalty=0.0,
+    trick_play_reward=1.0,
+    distance_penalty_scale=0.005,
+    progress_reward_scale=0.0,  # Disabled
+    stack_health_scale=0.0,  # Disabled
+    phase_multiplier_scale=0.0,  # Disabled
+)
+```
+
+**Results (1000 eval games):**
+
+| Metric           | Value   |
+| ---------------- | ------- |
+| Win rate         | 0.0%    |
+| Avg cards played | 84.7    |
+| Training time    | ~35 min |
+
+**Comparison:**
+
+| Training Steps | Avg Cards | Win Rate |
+| -------------- | --------- | -------- |
+| 300k           | 63.2      | 0%       |
+| 2M             | 84.7      | 0%       |
+| Baseline       | N/A       | 4.4%     |
+
+**Analysis:**
+
+- Cards played improved significantly (63.2 → 84.7) with more training
+- Still 0% win rate despite playing 86% of cards
+- Model learned to play cards efficiently but not to win
+- Simplified reward (no progress_reward) may be hurting - agent gets no signal for
+  partial success
+- The baseline strategy likely uses domain knowledge (trick plays, stack balancing) that
+  pure RL struggles to discover
+
 ### Best Known Configuration (84 cards avg, 1% win rate)
 
 Achieved in commit `fd61005` with 2M timesteps training.
