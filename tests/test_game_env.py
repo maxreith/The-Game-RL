@@ -24,10 +24,40 @@ class TestTheGameEnv:
         assert env.action_space.n == 29  # 7*4 + 1
 
     def test_observation_space_shape(self):
-        """Observation includes hand, stacks, gaps, deck, cards_played, min_required."""
+        """Observation includes hand, stacks, gaps, deck, cards_played, min_required, other hands, progress, hand_stats."""
         env = TheGameEnv(n_players=3, hand_size=6)
         # 6 hand + 4 stack tops + 4 stack gaps + 1 deck + 1 cards_played + 1 min_required
-        assert env.observation_space.shape == (17,)
+        # + 2 other_hand_sizes (3-1) + 1 total_progress + 3 hand_stats = 23
+        assert env.observation_space.shape == (23,)
+
+        env5 = TheGameEnv(n_players=5, hand_size=6)
+        # + 4 other_hand_sizes (5-1) = 25
+        assert env5.observation_space.shape == (25,)
+
+    def test_observation_space_with_max_players(self):
+        """Observation size is fixed based on max_players for curriculum learning."""
+        env2 = TheGameEnv(n_players=2, max_players=5, hand_size=6)
+        env3 = TheGameEnv(n_players=3, max_players=5, hand_size=6)
+        env5 = TheGameEnv(n_players=5, max_players=5, hand_size=6)
+
+        # All should have same observation size: 6 + 4 + 4 + 3 + 4 + 1 + 3 = 25
+        assert env2.observation_space.shape == (25,)
+        assert env3.observation_space.shape == (25,)
+        assert env5.observation_space.shape == (25,)
+
+    def test_observation_padding_with_fewer_players(self):
+        """Other hand sizes are padded with zeros when n_players < max_players."""
+        env = TheGameEnv(n_players=2, max_players=5, hand_size=6)
+        obs, _ = env.reset(seed=42)
+
+        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) + cards_played (1) + min_required (1) = 17
+        other_hands_start = 6 + 4 + 4 + 3
+        # First slot: player 2's hand (normalized to 1.0)
+        assert obs[other_hands_start] == pytest.approx(1.0, abs=0.01)
+        # Slots 2, 3, 4: padding (zeros)
+        assert obs[other_hands_start + 1] == 0.0
+        assert obs[other_hands_start + 2] == 0.0
+        assert obs[other_hands_start + 3] == 0.0
 
     def test_reset_returns_valid_observation(self):
         """Reset returns observation within bounds."""
@@ -84,7 +114,7 @@ class TestTheGameEnv:
         """Observation shows cards played this turn increasing."""
         env = TheGameEnv()
         obs, _ = env.reset(seed=42)
-        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) = 15
+        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) = index 15
         cards_played_idx = env.hand_size + 4 + 4 + 1
         assert obs[cards_played_idx] == 0
 
@@ -102,6 +132,44 @@ class TestTheGameEnv:
         min_required_idx = env.hand_size + 4 + 4 + 2
         # Normalized: (min_required - 1), so 2 -> 1.0
         assert obs[min_required_idx] == 1.0  # Deck exists at start
+
+    def test_other_hand_sizes_in_observation(self):
+        """Observation includes other players' hand sizes."""
+        env = TheGameEnv(n_players=3)
+        obs, _ = env.reset(seed=42)
+        # Position: hand (6) + stack_tops (4) + gaps (4) + deck (1) + cards_played (1) + min_required (1) = 17
+        other_hands_start = env.hand_size + 4 + 4 + 3
+        # All other players start with full hands (normalized to 1.0)
+        assert obs[other_hands_start] == pytest.approx(1.0, abs=0.01)
+        assert obs[other_hands_start + 1] == pytest.approx(1.0, abs=0.01)
+
+    def test_total_progress_in_observation(self):
+        """Observation includes total progress (cards played / 98)."""
+        env = TheGameEnv(n_players=3)
+        obs, _ = env.reset(seed=42)
+        # Position: other_hands_end + 1 total_progress
+        progress_idx = env.hand_size + 4 + 4 + 3 + (env.n_players - 1)
+        assert obs[progress_idx] == 0.0  # No cards played yet
+
+        # Play one card
+        mask = env.action_masks()
+        action = np.where(mask)[0][0]
+        obs, _, _, _, _ = env.step(action)
+        assert obs[progress_idx] == pytest.approx(1.0 / 98.0, abs=0.001)
+
+    def test_hand_stats_in_observation(self):
+        """Observation includes hand statistics (min, max, mean)."""
+        env = TheGameEnv(n_players=3)
+        obs, _ = env.reset(seed=42)
+        # Position: after total_progress
+        stats_start = env.hand_size + 4 + 4 + 3 + (env.n_players - 1) + 1
+        hand = env.hands[0]
+        expected_min = np.min(hand) / 100.0
+        expected_max = np.max(hand) / 100.0
+        expected_mean = np.mean(hand) / 100.0
+        assert obs[stats_start] == pytest.approx(expected_min, abs=0.01)
+        assert obs[stats_start + 1] == pytest.approx(expected_max, abs=0.01)
+        assert obs[stats_start + 2] == pytest.approx(expected_mean, abs=0.01)
 
 
 class TestGameMechanics:
@@ -178,7 +246,11 @@ class TestRewardStructure:
     def test_reward_per_card_configurable(self):
         """Custom reward_per_card is applied."""
         env = TheGameEnv(
-            reward_per_card=0.5, trick_play_reward=0, distance_penalty_scale=0
+            reward_per_card=0.5,
+            trick_play_reward=0,
+            distance_penalty_scale=0,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
         mask = env.action_masks()
@@ -202,7 +274,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+            reward_per_card=0.01,
+            trick_play_reward=0.1,
+            distance_penalty_scale=0,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -219,7 +295,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+            reward_per_card=0.01,
+            trick_play_reward=0.1,
+            distance_penalty_scale=0,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -236,7 +316,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.01
+            reward_per_card=0.01,
+            trick_play_reward=0,
+            distance_penalty_scale=0.01,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -254,7 +338,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.01
+            reward_per_card=0.01,
+            trick_play_reward=0,
+            distance_penalty_scale=0.01,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -272,7 +360,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0, distance_penalty_scale=0.001
+            reward_per_card=0.01,
+            trick_play_reward=0,
+            distance_penalty_scale=0.001,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -290,7 +382,11 @@ class TestRewardStructure:
         from utils import Stack
 
         env = TheGameEnv(
-            reward_per_card=0.01, trick_play_reward=0.1, distance_penalty_scale=0
+            reward_per_card=0.01,
+            trick_play_reward=0.1,
+            distance_penalty_scale=0,
+            stack_health_scale=0,
+            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -302,6 +398,60 @@ class TestRewardStructure:
         assert not terminated
         # Not a backwards trick (40 > 30, normal forward play on increasing stack)
         assert reward == pytest.approx(0.01, abs=0.001)
+
+    def test_stack_health_reward(self):
+        """Balanced stack usage gives bonus reward."""
+        from utils import Stack
+
+        env = TheGameEnv(
+            reward_per_card=0.0,
+            trick_play_reward=0.0,
+            distance_penalty_scale=0.0,
+            stack_health_scale=0.1,
+            phase_multiplier_scale=0.0,
+        )
+        env.reset(seed=42)
+
+        # Set up balanced stacks (all at similar gaps)
+        env.stacks[0] = Stack.from_array([99, 50])  # gap = 48/97 ~ 0.495
+        env.stacks[1] = Stack.from_array([99, 50])  # gap = 48/97 ~ 0.495
+        env.stacks[2] = Stack.from_array([1, 50])  # gap = 49/98 = 0.5
+        env.stacks[3] = Stack.from_array([1, 50])  # gap = 49/98 = 0.5
+        env.hands[0] = np.array([40, 45, 55, 60, 65, 70], dtype=np.int32)
+
+        action = 0 * 4 + 0  # Play 40 on decreasing stack
+        _, reward, terminated, _, _ = env.step(action)
+        assert not terminated
+        # Low variance -> bonus close to 0.1
+        assert reward > 0.09
+
+    def test_phase_multiplier_reward(self):
+        """Late game rewards are multiplied."""
+        env = TheGameEnv(
+            reward_per_card=0.1,
+            trick_play_reward=0.0,
+            distance_penalty_scale=0.0,
+            stack_health_scale=0.0,
+            phase_multiplier_scale=0.5,
+        )
+        env.reset(seed=42)
+
+        # At start, phase = 0, multiplier = 1.0
+        env.total_cards_played = 0
+        mask = env.action_masks()
+        action = np.where(mask)[0][0]
+        _, reward_early, _, _, _ = env.step(action)
+
+        env.reset(seed=42)
+        # Simulate late game
+        env.total_cards_played = 90
+        mask = env.action_masks()
+        action = np.where(mask)[0][0]
+        _, reward_late, _, _, _ = env.step(action)
+
+        # Late game should have higher reward due to phase multiplier
+        # phase = 91/98 ~ 0.93, multiplier ~ 1.465
+        assert reward_late > reward_early
 
 
 class TestMultiPlayer:

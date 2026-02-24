@@ -20,12 +20,16 @@ class TheGameEnv(gym.Env):
 
     Args:
         n_players: Number of players in the game.
+        max_players: Maximum players for fixed observation size (for curriculum learning).
         hand_size: Cards per player (6 for 3+ players, 7 for 2 players).
         reward_per_card: Reward for each successfully played card.
         win_reward: Bonus reward for winning the game.
         loss_penalty: Penalty for losing the game.
         trick_play_reward: Bonus for backwards trick plays (±10 reset cards).
-        distance_reward_scale: Scale for distance-based reward shaping.
+        distance_penalty_scale: Scale for distance-based reward shaping.
+        progress_reward_scale: Scale for progress bonus on loss.
+        stack_health_scale: Scale for balanced stack usage reward.
+        phase_multiplier_scale: Scale for late-game reward amplification.
     """
 
     metadata = {"render_modes": ["human"]}
@@ -33,6 +37,7 @@ class TheGameEnv(gym.Env):
     def __init__(
         self,
         n_players=3,
+        max_players=None,
         hand_size=None,
         reward_per_card=0.01,
         win_reward=1.0,
@@ -40,9 +45,12 @@ class TheGameEnv(gym.Env):
         trick_play_reward=0.1,
         distance_penalty_scale=0.001,
         progress_reward_scale=0.0,
+        stack_health_scale=0.01,
+        phase_multiplier_scale=0.5,
     ):
         super().__init__()
         self.n_players = n_players
+        self.max_players = max_players if max_players else n_players
         self.hand_size = hand_size if hand_size else (6 if n_players > 2 else 7)
         self.reward_per_card = reward_per_card
         self.win_reward = win_reward
@@ -50,6 +58,8 @@ class TheGameEnv(gym.Env):
         self.trick_play_reward = trick_play_reward
         self.distance_penalty_scale = distance_penalty_scale
         self.progress_reward_scale = progress_reward_scale
+        self.stack_health_scale = stack_health_scale
+        self.phase_multiplier_scale = phase_multiplier_scale
 
         # Action: card_index * 4 + stack_index, plus one "end turn" action
         # card_index in [0, hand_size-1], stack_index in [0, 3]
@@ -57,9 +67,11 @@ class TheGameEnv(gym.Env):
         self.action_space = spaces.Discrete(self.hand_size * 4 + 1)
 
         # Observation: [hand (hand_size), stack_tops (4), stack_gaps (4),
-        #               deck_remaining (1), cards_played_this_turn (1), min_cards_required (1)]
+        #               deck_remaining (1), cards_played_this_turn (1), min_cards_required (1),
+        #               other_hand_sizes (max_players - 1), total_progress (1), hand_stats (3)]
         # All values normalized to [0, 1] range
-        obs_size = self.hand_size + 4 + 4 + 3
+        # Use max_players for fixed observation size (curriculum learning compatibility)
+        obs_size = self.hand_size + 4 + 4 + 3 + (self.max_players - 1) + 1 + 3
         self.observation_space = spaces.Box(
             low=0, high=1.0, shape=(obs_size,), dtype=np.float32
         )
@@ -143,8 +155,42 @@ class TheGameEnv(gym.Env):
             [(self._min_cards_required() - 1)], dtype=np.float32
         )  # 0 or 1
 
+        # Other players' hand sizes (normalized by hand_size)
+        # Padded to max_players - 1 for curriculum learning compatibility
+        other_hand_sizes = np.zeros(self.max_players - 1, dtype=np.float32)
+        for i in range(1, self.n_players):
+            player_idx = (self.current_player_idx + i) % self.n_players
+            other_hand_sizes[i - 1] = len(self.hands[player_idx]) / self.hand_size
+        # Remaining slots stay 0 (padding for fewer players)
+
+        # Total progress indicator (normalized by 98 total cards)
+        total_progress = np.array([self.total_cards_played / 98.0], dtype=np.float32)
+
+        # Hand statistics (min, max, mean of non-empty cards)
+        hand_filled = hand[hand > 0] if len(hand) > 0 else np.array([50])
+        if len(hand_filled) == 0:
+            hand_filled = np.array([50])
+        hand_stats = np.array(
+            [
+                np.min(hand_filled) / 100.0,
+                np.max(hand_filled) / 100.0,
+                np.mean(hand_filled) / 100.0,
+            ],
+            dtype=np.float32,
+        )
+
         return np.concatenate(
-            [hand_obs, stack_tops, gaps, deck_remaining, cards_played, min_required]
+            [
+                hand_obs,
+                stack_tops,
+                gaps,
+                deck_remaining,
+                cards_played,
+                min_required,
+                other_hand_sizes,
+                total_progress,
+                hand_stats,
+            ]
         )
 
     def _min_cards_required(self):
@@ -352,6 +398,23 @@ class TheGameEnv(gym.Env):
         # Quadratic penalty for distance > 5
         if distance > 5:
             reward -= self.distance_penalty_scale * (distance - 5) ** 2
+
+        # Stack health reward: bonus for balanced stack usage (low gap variance)
+        if self.stack_health_scale > 0:
+            gaps = [
+                (self.stacks[0].top - 2) / 97.0,
+                (self.stacks[1].top - 2) / 97.0,
+                (99 - self.stacks[2].top) / 98.0,
+                (99 - self.stacks[3].top) / 98.0,
+            ]
+            gap_variance = np.var(gaps)
+            reward += self.stack_health_scale * (1.0 - gap_variance)
+
+        # Game phase multiplier: rewards increase late game
+        if self.phase_multiplier_scale > 0:
+            game_phase = self.total_cards_played / 98.0
+            phase_multiplier = 1.0 + self.phase_multiplier_scale * game_phase
+            reward *= phase_multiplier
 
         # Check for victory
         total_cards = len(self.remaining_deck) + sum(len(h) for h in self.hands)

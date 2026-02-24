@@ -14,6 +14,47 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from game_env import TheGameEnv
 
 
+def linear_schedule(initial_lr):
+    """Linear learning rate decay schedule.
+
+    Args:
+        initial_lr: Initial learning rate at the start of training.
+
+    Returns:
+        Function that computes learning rate based on progress remaining.
+    """
+
+    def func(progress_remaining):
+        return progress_remaining * initial_lr
+
+    return func
+
+
+class EntropyScheduleCallback(BaseCallback):
+    """Callback to decay entropy coefficient during training.
+
+    Decays linearly from start_ent to end_ent over the course of training.
+    Higher entropy early encourages exploration, lower entropy late encourages exploitation.
+
+    Args:
+        start_ent: Initial entropy coefficient.
+        end_ent: Final entropy coefficient.
+    """
+
+    def __init__(self, start_ent=0.05, end_ent=0.005, verbose=0):
+        super().__init__(verbose)
+        self.start_ent = start_ent
+        self.end_ent = end_ent
+
+    def _on_step(self):
+        progress = self.num_timesteps / self.model._total_timesteps
+        new_ent = self.start_ent - progress * (self.start_ent - self.end_ent)
+        self.model.ent_coef = new_ent
+        if self.verbose > 0 and self.num_timesteps % 100000 == 0:
+            self.logger.record("train/ent_coef_scheduled", new_ent)
+        return True
+
+
 class GameMetricsCallback(BaseCallback):
     """Callback to log custom game metrics to TensorBoard.
 
@@ -77,11 +118,13 @@ def mask_fn(env):
     return env.unwrapped.action_masks()
 
 
-def make_env(n_players=3, log_dir=None, env_idx=0):
+def make_env(n_players=3, max_players=None, hand_size=None, log_dir=None, env_idx=0):
     """Create a factory function for environment creation.
 
     Args:
         n_players: Number of players in the game.
+        max_players: Maximum players for fixed observation size (curriculum learning).
+        hand_size: Fixed hand size (for curriculum learning compatibility).
         log_dir: Directory for Monitor logs (optional).
         env_idx: Environment index for unique log filenames.
 
@@ -92,12 +135,16 @@ def make_env(n_players=3, log_dir=None, env_idx=0):
     def _init():
         env = TheGameEnv(
             n_players=n_players,
+            max_players=max_players,
+            hand_size=hand_size,
             reward_per_card=0.02,
             win_reward=10.0,
             loss_penalty=0.0,
             trick_play_reward=1.0,
             distance_penalty_scale=0.003,
             progress_reward_scale=3.0,
+            stack_health_scale=0.01,
+            phase_multiplier_scale=0.5,
         )
         if log_dir is not None:
             env = Monitor(env, filename=f"{log_dir}/env_{env_idx}")
@@ -106,11 +153,20 @@ def make_env(n_players=3, log_dir=None, env_idx=0):
     return _init
 
 
-def create_env(n_players=3, n_envs=1, use_subproc=True, log_dir=None):
+def create_env(
+    n_players=3,
+    max_players=None,
+    hand_size=None,
+    n_envs=1,
+    use_subproc=True,
+    log_dir=None,
+):
     """Create vectorized environment for MaskablePPO training.
 
     Args:
         n_players: Number of players in the game.
+        max_players: Maximum players for fixed observation size (curriculum learning).
+        hand_size: Fixed hand size (for curriculum learning compatibility).
         n_envs: Number of parallel environments.
         use_subproc: Use SubprocVecEnv (True) or DummyVecEnv (False).
         log_dir: Directory for Monitor logs.
@@ -118,7 +174,9 @@ def create_env(n_players=3, n_envs=1, use_subproc=True, log_dir=None):
     Returns:
         Vectorized environment with action masking.
     """
-    env_fns = [make_env(n_players, log_dir, i) for i in range(n_envs)]
+    env_fns = [
+        make_env(n_players, max_players, hand_size, log_dir, i) for i in range(n_envs)
+    ]
 
     if n_envs == 1:
         return DummyVecEnv(env_fns)
@@ -177,16 +235,19 @@ def train(
         tensorboard_log=log_path,
         gamma=0.99,
         gae_lambda=0.95,
-        ent_coef=0.02,
-        learning_rate=3e-4,
+        ent_coef=0.05,
+        learning_rate=linear_schedule(3e-4),
         n_steps=2048,
         batch_size=256,
         n_epochs=10,
         clip_range=0.2,
     )
 
-    callback = GameMetricsCallback(verbose=verbose)
-    model.learn(total_timesteps=total_timesteps, callback=callback)
+    callbacks = [
+        GameMetricsCallback(verbose=verbose),
+        EntropyScheduleCallback(start_ent=0.05, end_ent=0.005, verbose=verbose),
+    ]
+    model.learn(total_timesteps=total_timesteps, callback=callbacks)
     model.save(bld_dir / "the_game_ppo")
 
     return model
