@@ -78,154 +78,27 @@ environment variable (defaults to `gemini-3-flash-preview`).
 
 All generated outputs (plots, parquet files) go to `bld/` directory.
 
-## Reinforcement Learning Training Plan
+## Reinforcement Learning
 
-### Overview
-
-Train a neural network via RL to play the cooperative multi-player game. Training
-happens from the perspective of a single player, but all players share the same policy
-(centralized training with parameter sharing).
-
-### Recommended Method: PPO (Proximal Policy Optimization)
-
-- Stable training with clipped objective
-- Works well for discrete action spaces
-- Widely used, well-documented
-
-### Packages
+Uses MaskablePPO from `sb3-contrib` with gymnasium environment. Training from single
+player perspective with parameter sharing across all players.
 
 ```bash
-pixi add gymnasium stable-baselines3 sb3-contrib
+pixi run python src/train_rl.py
+pixi run tensorboard --logdir bld/rl_logs/
 ```
 
-| Package           | Purpose                                     |
-| ----------------- | ------------------------------------------- |
-| gymnasium         | Standard RL environment interface           |
-| stable-baselines3 | PPO implementation (PyTorch-based)          |
-| sb3-contrib       | MaskablePPO for handling invalid card plays |
+## RL Experiment Results
 
-### Key RL Concepts to Study
+### Baseline
 
-**Foundations (read first):**
+| Strategy            | Players | Win Rate      |
+| ------------------- | ------- | ------------- |
+| bonus_play_strategy | 3       | 1.4%          |
+| bonus_play_strategy | 5       | 4.4%          |
+| random              | 5       | ~14 cards avg |
 
-1. Markov Decision Process (MDP) - state, action, reward, transition
-1. Value functions - V(s) and Q(s,a), Bellman equations
-1. Policy gradient theorem
-1. Actor-Critic architecture
-1. Advantage estimation (GAE)
-
-**Practical for this game:** 6. Action masking - block illegal card plays 7. Reward
-shaping - intermediate rewards beyond win/loss 8. Centralized training with
-decentralized execution (CTDE) - train one policy, all players use it
-
-**Resource:** Spinning Up in Deep RL (OpenAI) - https://spinningup.openai.com/
-
-### Multi-Player Environment Design
-
-```python
-class TheGameEnv(gym.Env):
-    """Multi-player cooperative environment for The Game.
-
-    Training perspective: single player's turn.
-    All players share the same policy (parameter sharing).
-    Other players' actions simulated using the same policy.
-    """
-
-    def __init__(self, n_players=3, hand_size=6):
-        self.n_players = n_players
-        self.hand_size = hand_size
-
-        # Action: card index × stack index
-        self.action_space = spaces.Discrete(hand_size * 4)
-
-        # State: current player's hand + stack tops + deck size
-        # Note: other players' hands are hidden (partial observability)
-        self.observation_space = spaces.Box(
-            low=0, high=99, shape=(hand_size + 4 + 1,), dtype=np.float32
-        )
-
-    def step(self, action):
-        # 1. Execute current player's action
-        # 2. Simulate other players using same policy
-        # 3. Return to current player's next turn
-        ...
-
-    def action_masks(self):
-        # Boolean array: which (card, stack) combinations are legal
-        ...
-```
-
-### State Representation
-
-| Component      | Shape | Description                  |
-| -------------- | ----- | ---------------------------- |
-| Player hand    | (6,)  | Card values (0 = empty slot) |
-| Stack tops     | (4,)  | Current top of each pile     |
-| Deck remaining | (1,)  | Cards left to draw           |
-
-**Note:** Other players' hands are hidden (partial observability), reflecting real
-gameplay.
-
-### Reward Design
-
-| Strategy        | Description                    |
-| --------------- | ------------------------------ |
-| Per-card reward | +0.01 per successful card play |
-| Win bonus       | +1.0 on victory                |
-| Loss penalty    | -0.5 on game over              |
-
-```python
-reward = 0.01  # Each card played
-if victory:
-    reward += 1.0
-elif game_over:
-    reward -= 0.5
-```
-
-### Training Script
-
-```python
-from stable_baselines3 import PPO
-from sb3_contrib import MaskablePPO
-from game_env import TheGameEnv
-
-env = TheGameEnv(n_players=3)
-
-model = MaskablePPO("MlpPolicy", env, verbose=1, tensorboard_log="./bld/rl_logs/")
-
-model.learn(total_timesteps=500_000)
-model.save("bld/the_game_ppo")
-```
-
-### Files to Create
-
-| File                     | Purpose                       |
-| ------------------------ | ----------------------------- |
-| `src/game_env.py`        | Gymnasium environment wrapper |
-| `src/train_rl.py`        | Training script               |
-| `tests/test_game_env.py` | Environment validation tests  |
-
-### Verification
-
-1. `check_env(TheGameEnv())` - validate Gymnasium compatibility
-1. Manual test with random actions
-1. Short training run (1000 steps) - verify no crashes
-1. Compare trained agent vs `bonus_play_strategy` win rate
-1. Monitor training via TensorBoard: `pixi run tensorboard --logdir bld/rl_logs/`
-
-## RL Reward Tuning Experiments
-
-### Baseline Performance
-
-| Strategy            | Players | Win Rate |
-| ------------------- | ------- | -------- |
-| bonus_play_strategy | 3       | 1.4%     |
-| bonus_play_strategy | 5       | 4.4%     |
-
-### Grid Search Results (300k steps, 5 players, 500 eval games)
-
-Tested 9 reward configurations with simplified reward shaping (disabled progress_reward,
-stack_health, phase_multiplier).
+### Grid Search (300k steps, 5 players, 500 eval games)
 
 | Config                | Win% | Avg Cards | reward_per_card | win_reward | loss_penalty | trick_play | dist_penalty |
 | --------------------- | ---- | --------- | --------------- | ---------- | ------------ | ---------- | ------------ |
@@ -239,120 +112,44 @@ stack_health, phase_multiplier).
 | simple_baseline       | 0%   | 56.2      | 0.05            | 10.0       | 0.0          | 0.0        | 0.000        |
 | with_trick_bonus      | 0%   | 33.7      | 0.05            | 10.0       | 0.0          | 1.0        | 0.000        |
 
-**Key findings:**
-
-- All configs achieved 0% win rate (vs 4.4% baseline) - 300k steps insufficient
-- `trick_and_distance` played most cards (63.2/98)
-- `with_trick_bonus` alone hurt performance badly (33.7 cards) - trick bonus without
-  distance penalty causes poor play
-- Distance penalty improves card count significantly
-
 ### Extended Training: trick_and_distance at 2M steps
-
-Best config from grid search trained for 2M steps (vs 300k).
-
-**Configuration:**
-
-```python
-TheGameEnv(
-    n_players=5,
-    reward_per_card=0.05,
-    win_reward=10.0,
-    loss_penalty=0.0,
-    trick_play_reward=1.0,
-    distance_penalty_scale=0.005,
-    progress_reward_scale=0.0,  # Disabled
-    stack_health_scale=0.0,  # Disabled
-    phase_multiplier_scale=0.0,  # Disabled
-)
-```
-
-**Results (1000 eval games):**
-
-| Metric           | Value   |
-| ---------------- | ------- |
-| Win rate         | 0.0%    |
-| Avg cards played | 84.7    |
-| Training time    | ~35 min |
-
-**Comparison:**
 
 | Training Steps | Avg Cards | Win Rate |
 | -------------- | --------- | -------- |
 | 300k           | 63.2      | 0%       |
 | 2M             | 84.7      | 0%       |
-| Baseline       | N/A       | 4.4%     |
 
-**Analysis:**
+Configuration:
+`n_players=5, reward_per_card=0.05, win_reward=10.0, loss_penalty=0.0, trick_play_reward=1.0, distance_penalty_scale=0.005, progress_reward_scale=0.0`
 
-- Cards played improved significantly (63.2 → 84.7) with more training
-- Still 0% win rate despite playing 86% of cards
-- Model learned to play cards efficiently but not to win
-- Simplified reward (no progress_reward) may be hurting - agent gets no signal for
-  partial success
-- The baseline strategy likely uses domain knowledge (trick plays, stack balancing) that
-  pure RL struggles to discover
+### Best Configuration (2M steps, commit fd61005)
 
-### Best Known Configuration (84 cards avg, 1% win rate)
+| Metric        | Value   |
+| ------------- | ------- |
+| Win rate      | 1%      |
+| Avg cards     | 84      |
+| Training time | ~35 min |
 
-Achieved in commit `fd61005` with 2M timesteps training.
+**Environment:**
+`n_players=5, reward_per_card=0.02, win_reward=10.0, loss_penalty=0.0, trick_play_reward=1.0, distance_penalty_scale=0.003, progress_reward_scale=3.0`
 
-**Environment Configuration:**
+**Observation space (17 features):** hand(6), stack_tops(4), stack_gaps(4),
+deck_remaining, cards_played_this_turn, min_cards_required
 
-```python
-TheGameEnv(
-    n_players=5,  # 5 players (easier than 3)
-    reward_per_card=0.02,
-    win_reward=10.0,
-    loss_penalty=0.0,  # No penalty for losing
-    trick_play_reward=1.0,
-    distance_penalty_scale=0.003,
-    progress_reward_scale=3.0,  # Reward partial game completion
-    stack_health_scale=0.0,  # Not used
-    phase_multiplier_scale=0.0,  # Not used
-)
+**PPO:**
+`gamma=0.99, gae_lambda=0.95, ent_coef=0.02, learning_rate=3e-4, n_steps=2048, batch_size=256, n_epochs=10, clip_range=0.2, net_arch=[256,256]`
+
+### Hierarchical RL (sequential card-then-stack decisions)
+
+Breaks turn into phases: CHOOSE_CARD(0-5) → CHOOSE_STACK(0-3) → CONTINUE(0-1). Reduces
+action space from 25 to 6.
+
+Files: `src/hierarchical_game_env.py`, `src/train_hierarchical_rl.py`,
+`src/evaluate_hierarchical.py`
+
+```bash
+pixi run python src/train_hierarchical_rl.py
+pixi run python src/evaluate_hierarchical.py
 ```
 
-**Observation Space (17 features):**
-
-- Hand cards (6)
-- Stack tops (4)
-- Stack gaps (4)
-- Deck remaining, cards played this turn, min cards required (3)
-- Note: Simpler than current (no other_hand_sizes, total_progress, hand_stats)
-
-**PPO Hyperparameters:**
-
-```python
-MaskablePPO(
-    gamma=0.99,  # Discount factor
-    gae_lambda=0.95,
-    ent_coef=0.02,  # Fixed (no decay)
-    learning_rate=3e-4,  # Fixed (no schedule)
-    n_steps=2048,
-    batch_size=256,
-    n_epochs=10,
-    clip_range=0.2,
-    net_arch=dict(pi=[256, 256], vf=[256, 256]),
-)
-```
-
-**Training Setup:**
-
-- Total timesteps: 2,000,000 (2M)
-- Parallel environments: CPU count (typically 8-12)
-- Training time: ~30-60 minutes on modern CPU
-
-**Results:**
-
-- Average cards played: ~84 / 98 (86%)
-- Win rate: 1% (vs 4.4% baseline strategy)
-- Random baseline: ~14 cards
-
-**Key insights:**
-
-- No loss penalty allows agent to explore risky plays
-- Progress reward (3.0 scale) crucial for learning partial success
-- Simpler observation space may improve learning efficiency
-- Fixed hyperparameters (vs schedules) worked well
-- 5 players makes game easier due to more cards per hand
+Same reward config as best known. Results not yet documented.
