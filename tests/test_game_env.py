@@ -1190,7 +1190,7 @@ class TestWinRateParity:
         from functools import partial
 
         from game_setup import run_simulation
-        from strategies import _identify_min_distance_card, bonus_play_strategy
+        from strategies import identify_min_distance_card, bonus_play_strategy
 
         def play_game_bonus_strategy_env(env, seed, bonus_play_threshold=2):
             obs, info = env.reset(seed=seed)
@@ -1204,7 +1204,7 @@ class TestWinRateParity:
 
                 if cards_played >= n_cards_to_play:
                     try:
-                        _, _, min_diff = _identify_min_distance_card(hand, stacks)
+                        _, _, min_diff = identify_min_distance_card(hand, stacks)
                         if min_diff > bonus_play_threshold:
                             obs, _, term, trunc, info = env.step(end_turn_action)
                             if term or trunc:
@@ -1217,7 +1217,7 @@ class TestWinRateParity:
                         continue
 
                 try:
-                    best_card, best_stack_idx, _ = _identify_min_distance_card(
+                    best_card, best_stack_idx, _ = identify_min_distance_card(
                         hand, stacks
                     )
                 except Exception:

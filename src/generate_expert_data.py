@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from game_env import TheGameEnv
-from strategies import _identify_min_distance_card
+from strategies import identify_min_distance_card
 from utils import GameOverError
 
 
@@ -33,7 +33,7 @@ def get_expert_action(env: TheGameEnv, bonus_play_threshold: int = 4) -> int:
         return end_turn_action
 
     try:
-        best_card, best_stack, min_diff = _identify_min_distance_card(hand, stacks)
+        best_card, best_stack, min_diff = identify_min_distance_card(hand, stacks)
     except GameOverError:
         return end_turn_action
 

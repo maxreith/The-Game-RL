@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from utils import Stack, _play_to_stack
+from utils import Stack, play_to_stack
 
 
 class TheGameEnv(gym.Env):
@@ -382,7 +382,7 @@ class TheGameEnv(gym.Env):
         try:
             stack_top = self.stacks[stack_idx].top
             distance = abs(card - stack_top)
-            new_hand, new_stacks = _play_to_stack(hand, card, stack_idx, self.stacks)
+            new_hand, new_stacks = play_to_stack(hand, card, stack_idx, self.stacks)
             self.hands[self.current_player_idx] = new_hand
             self.stacks = new_stacks
             self.cards_played_this_turn += 1

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from utils import _play_to_stack, GameOverError, create_stacks
-from strategies import bonus_play_strategy, _call_api_to_get_play_order, gemini_strategy
+from utils import play_to_stack, GameOverError, create_stacks
+from strategies import bonus_play_strategy, call_api_to_get_play_order, gemini_strategy
 
 
 def assert_stack_equals(stacks, expected_array):
@@ -29,9 +29,9 @@ def normal_hand():
     return np.array([2, 22, 40, 45, 51, 57])
 
 
-def test_play_to_stack_plays_single_card(empty_stacks):
+def testplay_to_stack_plays_single_card(empty_stacks):
     stacks = empty_stacks
-    actual_new_hand, actual_new_stacks = _play_to_stack(
+    actual_new_hand, actual_new_stacks = play_to_stack(
         hand=np.array([10, 20, 30]), card=20, chosen_stack=2, all_stacks=stacks
     )
     expected_new_hand = np.array([10, 30])
@@ -40,18 +40,18 @@ def test_play_to_stack_plays_single_card(empty_stacks):
     assert np.array_equal(actual_new_stacks[2].to_array(), expected_new_stack)
 
 
-def test_play_to_stack_card_missing(empty_stacks):
+def testplay_to_stack_card_missing(empty_stacks):
     stacks = empty_stacks
     with pytest.raises(ValueError):
-        _play_to_stack(
+        play_to_stack(
             hand=np.array([10, 20, 30]), card=25, chosen_stack=2, all_stacks=stacks
         )
 
 
-def test_play_to_stack_invalid_move(midgame_stacks, normal_hand):
+def testplay_to_stack_invalid_move(midgame_stacks, normal_hand):
     stacks, hand = midgame_stacks, normal_hand
     with pytest.raises(ValueError):
-        _play_to_stack(
+        play_to_stack(
             hand=hand,
             card=10,  # card is not in hand
             chosen_stack=2,
@@ -97,9 +97,9 @@ def test_bonus_play_strategy_game_over(game_over_stacks):
         bonus_play_strategy(np.array([4, 5, 6, 7]), game_over_stacks)
 
 
-def test_call_api_to_get_play_order_structure(empty_stacks):
+def testcall_api_to_get_play_order_structure(empty_stacks):
     stacks = empty_stacks
-    play_order = _call_api_to_get_play_order(
+    play_order = call_api_to_get_play_order(
         hand=np.array([10, 20, 30]), stacks=stacks, n_cards_to_play=2
     )
     assert hasattr(play_order, "list")

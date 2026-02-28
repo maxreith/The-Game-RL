@@ -125,7 +125,7 @@ def create_stacks(dec1_top=99, dec2_top=99, inc1_top=1, inc2_top=1):
 # =============================================================================
 # Helper Functions
 # =============================================================================
-def _play_to_stack(hand, card, chosen_stack, all_stacks):
+def play_to_stack(hand, card, chosen_stack, all_stacks):
     """Play a card to a stack by index if valid. Pure function (copies stacks).
 
     Args:
@@ -183,9 +183,7 @@ def _build_stack_description(stack_idx, top_value):
     return f"Stack {stack_idx} ({direction}): top={top_value} → Valid plays: {valid_range} {reset_note}".strip()
 
 
-def _call_api_to_get_play_order(
-    hand, stacks, n_cards_to_play, thinking_level="minimal"
-):
+def call_api_to_get_play_order(hand, stacks, n_cards_to_play, thinking_level="minimal"):
     """Get play order from Gemini API.
 
     Args:

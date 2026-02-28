@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import GameOverError, _play_to_stack, _call_api_to_get_play_order
+from utils import GameOverError, play_to_stack, call_api_to_get_play_order
 
 
 def bonus_play_strategy(
@@ -21,15 +21,15 @@ def bonus_play_strategy(
     original_hand_size = len(hand)
 
     for i in range(original_hand_size):
-        best_card, best_stack, min_diff = _identify_min_distance_card(hand, stacks)
+        best_card, best_stack, min_diff = identify_min_distance_card(hand, stacks)
         if i >= n_cards_to_play and min_diff > bonus_play_threshold:
             break
-        hand, stacks = _play_to_stack(hand, best_card, best_stack, stacks)
+        hand, stacks = play_to_stack(hand, best_card, best_stack, stacks)
 
     return hand, stacks
 
 
-def _identify_min_distance_card(hand, stacks):
+def identify_min_distance_card(hand, stacks):
     """Identify the best card and stack to play on.
 
     Args:
@@ -73,13 +73,13 @@ def gemini_strategy(
         Tuple of (updated hand, updated stacks).
     """
     n_cards_to_play = 2 if len(remaining_deck) > 0 else 1
-    play_order = _call_api_to_get_play_order(
+    play_order = call_api_to_get_play_order(
         hand, stacks, n_cards_to_play, thinking_level
     )
 
     for play in play_order.list:
         try:
-            hand, stacks = _play_to_stack(hand, play.card, play.stack, stacks)
+            hand, stacks = play_to_stack(hand, play.card, play.stack, stacks)
         except ValueError as e:
             raise GameOverError(
                 f"""Gemini requested an invalid play. Tried to play card {getattr(play, "card", None)} on stack {getattr(play, "stack", None)}

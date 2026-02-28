@@ -3,7 +3,7 @@ import numpy as np
 from utils import GameOverError, Stack
 
 
-def _shuffle_cards_custom(card_deck=None, n_shuffles=200):
+def shuffle_cards_custom(card_deck=None, n_shuffles=200):
     "Shuffles card deck"
     if card_deck is None:
         card_deck = np.arange(2, 100)
@@ -18,7 +18,7 @@ def _shuffle_cards_custom(card_deck=None, n_shuffles=200):
     return shuffled_deck
 
 
-def _shuffle_cards(card_deck=None, n_shuffles=200):
+def shuffle_cards(card_deck=None, n_shuffles=200):
     "Shuffles card deck"
     if card_deck is None:
         card_deck = np.arange(2, 100)
@@ -28,7 +28,7 @@ def _shuffle_cards(card_deck=None, n_shuffles=200):
     return shuffled_deck
 
 
-def _initiate_game(n_players, card_deck, hand_size=6):
+def initiate_game(n_players, card_deck, hand_size=6):
     """Create and deal cards to players.
 
     Args:
@@ -58,7 +58,7 @@ def _initiate_game(n_players, card_deck, hand_size=6):
     return hands, card_deck[card_index:], stacks
 
 
-def _draw_cards(hand, remaining_deck, hand_size=6):
+def draw_cards(hand, remaining_deck, hand_size=6):
     """Draw cards from deck to refill hand.
 
     Args:
@@ -92,11 +92,11 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
     """
     hand_size = 6 if n_players > 2 else 7
     shuffled_deck = (
-        _shuffle_cards_custom(n_shuffles=n_shuffles)
+        shuffle_cards_custom(n_shuffles=n_shuffles)
         if use_custom_shuffle
-        else _shuffle_cards(n_shuffles=n_shuffles)
+        else shuffle_cards(n_shuffles=n_shuffles)
     )
-    hands, remaining_deck, stacks = _initiate_game(n_players, shuffled_deck, hand_size)
+    hands, remaining_deck, stacks = initiate_game(n_players, shuffled_deck, hand_size)
 
     turn = 0
 
@@ -110,7 +110,7 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
                 if len(hand) == 0:
                     continue
                 hand, stacks = strategy(hand, stacks, remaining_deck)
-                hand, remaining_deck = _draw_cards(hand, remaining_deck, hand_size)
+                hand, remaining_deck = draw_cards(hand, remaining_deck, hand_size)
                 hands[i] = hand
 
         return {
