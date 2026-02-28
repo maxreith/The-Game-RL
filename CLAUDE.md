@@ -88,6 +88,41 @@ pixi run python src/train_rl.py
 pixi run tensorboard --logdir bld/rl_logs/
 ```
 
+### Post-Training Outputs
+
+After training a model, produce:
+
+1. **Graphs**: Run `pixi run python src/generate_plots.py` (if applicable data exists)
+
+1. **Example game log** at `bld/{model_name}_example_game.md` with 3 example games
+   showing:
+
+   - Step-by-step gameplay from start to finish
+   - At each step: player number, hand, stack tops, and the action taken
+   - For losses: explain why the agent failed (which cards couldn't be played and why)
+
+Example format for the game log:
+
+```
+## Example Game 1 (seed=42)
+
+### Step 1: Player 1
+- Hand: [12, 25, 34, 67, 78, 91]
+- Stacks: Dec1=99, Dec2=99, Inc1=1, Inc2=1
+- Action: Play 12 on Inc1 (top=1)
+
+### Step 2: Player 1
+- Hand: [25, 34, 67, 78, 91]
+- Stacks: Dec1=99, Dec2=99, Inc1=12, Inc2=1
+- Action: Play 25 on Inc1 (top=12)
+...
+
+### Final Step: Player 3 - LOSS
+- Hand: [50]
+- Stacks: Dec1=10, Dec2=10, Inc1=95, Inc2=95
+- No valid moves: 50 cannot be played (need <10 or >95)
+```
+
 ## RL Experiment Results
 
 ### Baseline
@@ -153,3 +188,36 @@ pixi run python src/evaluate_hierarchical.py
 ```
 
 Same reward config as best known. Results not yet documented.
+
+### BC+RL (Behavioral Cloning + RL Fine-Tuning)
+
+Two-phase approach: pre-train policy via supervised learning on expert demonstrations,
+then fine-tune with RL.
+
+Files: `src/generate_expert_data.py`, `src/train_bc_rl.py`
+
+```bash
+pixi run python src/train_bc_rl.py
+```
+
+**Results (5 players, 1000 eval games):**
+
+| Agent                | Win Rate | Avg Cards | Training Steps |
+| -------------------- | -------- | --------- | -------------- |
+| Expert (bonus_play)  | 4.2%     | 87.3      | -              |
+| BC-only              | 5.5%     | 87.0      | -              |
+| BC+RL (full rewards) | 3.0%     | 87.5      | 1M             |
+| BC+RL (simplified)   | 5.3%     | 88.0      | 2M             |
+| Pure RL (best known) | 1.0%     | 84.0      | 2M             |
+
+**Key finding:** Simplified reward shaping during RL fine-tuning preserves BC policy
+quality. Setting `reward_per_card=0, progress_reward_scale=0, phase_multiplier_scale=0`
+achieves 5.3% win rate, nearly matching BC-only (5.5%).
+
+**BC training:** 98% validation accuracy, ~20 min training on 1.27M expert samples.
+
+**RL fine-tuning hyperparams (conservative to preserve BC knowledge):**
+`learning_rate=5e-5, ent_coef=0.01, clip_range=0.1, n_epochs=5`
+
+**Simplified rewards for RL phase:**
+`reward_per_card=0, win_reward=10.0, trick_play_reward=1.0, distance_penalty_scale=0.003, progress_reward_scale=0, phase_multiplier_scale=0`
