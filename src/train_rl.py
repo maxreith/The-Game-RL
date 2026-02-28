@@ -138,13 +138,13 @@ def make_env(n_players=3, max_players=None, hand_size=None, log_dir=None, env_id
             max_players=max_players,
             hand_size=hand_size,
             reward_per_card=0.02,
-            win_reward=10.0,
-            loss_penalty=0.0,
+            win_reward=100.0,
+            loss_penalty=0.5,
             trick_play_reward=1.0,
             distance_penalty_scale=0.003,
-            progress_reward_scale=3.0,
-            stack_health_scale=0.01,
-            phase_multiplier_scale=0.5,
+            progress_reward_scale=0.0,
+            stack_health_scale=0.0,
+            phase_multiplier_scale=0.0,
         )
         if log_dir is not None:
             env = Monitor(env, filename=f"{log_dir}/env_{env_idx}")

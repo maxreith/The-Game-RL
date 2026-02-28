@@ -174,6 +174,22 @@ deck_remaining, cards_played_this_turn, min_cards_required
 **PPO:**
 `gamma=0.99, gae_lambda=0.95, ent_coef=0.02, learning_rate=3e-4, n_steps=2048, batch_size=256, n_epochs=10, clip_range=0.2, net_arch=[256,256]`
 
+### Simplified Rewards (20M steps)
+
+| Metric        | Value   |
+| ------------- | ------- |
+| Win rate      | 4.8%    |
+| Avg cards     | 87.9    |
+| Training time | ~58 min |
+
+**Reward structure:**
+`reward_per_card=0.02, win_reward=100.0, loss_penalty=0.5, trick_play_reward=1.0, distance_penalty_scale=0.003, progress_reward_scale=0.0, stack_health_scale=0.0, phase_multiplier_scale=0.0`
+
+**Key changes:** Removed progress_reward_scale, stack_health_scale, and
+phase_multiplier_scale. Increased win_reward from 10 to 100. Reactivated loss_penalty at
+0.5. This simplified structure with a large terminal win bonus outperforms the previous
+best pure RL (1%) and matches the expert baseline (4.4%).
+
 ### Hierarchical RL (sequential card-then-stack decisions)
 
 Breaks turn into phases: CHOOSE_CARD(0-5) → CHOOSE_STACK(0-3) → CONTINUE(0-1). Reduces
@@ -208,7 +224,8 @@ pixi run python src/train_bc_rl.py
 | BC-only              | 5.5%     | 87.0      | -              |
 | BC+RL (full rewards) | 3.0%     | 87.5      | 1M             |
 | BC+RL (simplified)   | 5.3%     | 88.0      | 2M             |
-| Pure RL (best known) | 1.0%     | 84.0      | 2M             |
+| Pure RL (simplified) | 4.8%     | 87.9      | 20M            |
+| Pure RL (old best)   | 1.0%     | 84.0      | 2M             |
 
 **Key finding:** Simplified reward shaping during RL fine-tuning preserves BC policy
 quality. Setting `reward_per_card=0, progress_reward_scale=0, phase_multiplier_scale=0`
