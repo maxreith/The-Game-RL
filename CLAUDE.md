@@ -16,10 +16,7 @@ AI as a player.
 # Install dependencies
 pixi install
 
-# Run all simulations via pytask
-pixi run pytask
-
-# Run individual simulations
+# Run simulations
 pixi run python src/simulate_strategies.py
 pixi run python src/simulate_shuffle_quality.py
 pixi run python src/simulate_gemini_thinking.py
