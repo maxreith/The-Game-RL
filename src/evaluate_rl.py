@@ -95,88 +95,25 @@ def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
     }
 
 
-def replay_single_game(model, n_players=5, seed=None, verbose=True):
-    """Replay a single game with the RL agent and print every step."""
+def replay_single_game(model, n_players=5, seed=None):
+    """Replay a single game with the RL agent.
+
+    Args:
+        model: Trained MaskablePPO model.
+        n_players: Number of players.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        True if game was won, False otherwise.
+    """
     env = TheGameEnv(n_players=n_players)
     obs, info = env.reset(seed=seed)
     terminated = False
-    step = 0
-    turn = 0
-
-    if verbose:
-        print(f"\n{'=' * 60}")
-        print(f"SAMPLE GAME  (seed={seed}, players={n_players})")
-        print(f"{'=' * 60}")
-
-    cards_this_turn = 0
 
     while not terminated:
         action_mask = env.action_masks()
         action, _ = model.predict(obs, deterministic=True, action_masks=action_mask)
-
-        # Capture state BEFORE the step
-        game = getattr(env, "game", None)
-        state = getattr(game, "state", None) if game else None
-        pile_tops_before = None
-        hand_before = None
-        current_player = "?"
-        if state is not None:
-            pile_tops_before = [p.top for p in state.piles]
-            current_player = getattr(state, "current_player", "?")
-            if hasattr(state, "hands"):
-                hand_before = sorted(state.hands[state.current_player])
-
         obs, reward, terminated, truncated, info = env.step(action)
-        step += 1
-
-        is_pass = action == 0
-        if verbose:
-            if is_pass:
-                print(f"  → END TURN (played {cards_this_turn} card(s))\n")
-                turn += 1
-                cards_this_turn = 0
-            else:
-                # Decode action to (card, stack)
-                decoded = None
-                if hasattr(env, "decode_action"):
-                    decoded = env.decode_action(action)
-                elif hasattr(env, "_decode_action"):
-                    decoded = env._decode_action(action)
-                elif hasattr(env, "action_to_card_stack"):
-                    decoded = env.action_to_card_stack.get(action)
-
-                stack_names = {
-                    0: "declining stack 1",
-                    1: "declining stack 2",
-                    2: "inclining stack 1",
-                    3: "inclining stack 2",
-                }
-                hand_str = ",".join(str(c) for c in hand_before) if hand_before else "?"
-
-                if decoded is not None:
-                    card, stack_idx = decoded
-                    stack_name = stack_names.get(stack_idx, f"stack {stack_idx}")
-                    top_before = (
-                        pile_tops_before[stack_idx] if pile_tops_before else "?"
-                    )
-                    print(
-                        f"  Player {current_player}: play card {card} on {stack_name} "
-                        f"with current top {top_before}. "
-                        f"Hand: [{hand_str}]  (reward={reward:.3f})"
-                    )
-                else:
-                    print(
-                        f"  Player {current_player}: action {action}. "
-                        f"Hand: [{hand_str}]  (reward={reward:.3f})"
-                    )
-                cards_this_turn += 1
-
-    if verbose:
-        victory = info.get("victory", False)
-        print(f"\n{'=' * 60}")
-        print(f"GAME OVER — {'VICTORY 🎉' if victory else 'DEFEAT 💀'}")
-        print(f"Total cards played: {env.total_cards_played}")
-        print(f"{'=' * 60}\n")
 
     return info.get("victory", False)
 
@@ -273,12 +210,10 @@ def main():
     output_lines.append("=" * 60)
 
     output_text = "\n".join(output_lines)
-    print(output_text)
 
     output_file = bld_dir / "evaluation_results.txt"
     bld_dir.mkdir(parents=True, exist_ok=True)
     output_file.write_text(output_text)
-    print(f"\nResults saved to {output_file}")
 
 
 if __name__ == "__main__":
