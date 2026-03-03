@@ -33,7 +33,7 @@ class TheGameEnv(gym.Env):
 
     def __init__(
         self,
-        n_players=3,
+        n_players=5,
         max_players=None,
         hand_size=None,
         reward_per_card=0.01,

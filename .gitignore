@@ -20,6 +20,7 @@ bld/*
 !bld/bc_rl_checkpoints/
 bld/bc_rl_checkpoints/*
 !bld/bc_rl_checkpoints/bc_rl_100000000_steps.zip
+!bld/*_example_games.md
 *.parquet
 
 # Other

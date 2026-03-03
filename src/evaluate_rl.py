@@ -4,11 +4,13 @@ from functools import partial
 from pathlib import Path
 
 import numpy as np
+import torch
 from sb3_contrib import MaskablePPO
 
 from game_env import TheGameEnv
 from game_setup import run_simulation
 from strategies import bonus_play_strategy
+from train_bc_rl import BCPolicyNetwork
 
 
 def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
@@ -181,7 +183,7 @@ def replay_single_game(model, n_players=5, seed=None, verbose=True):
     return info.get("victory", False)
 
 
-def evaluate_baseline(n_games=1000, n_players=3, bonus_threshold=2, seed=None):
+def evaluate_baseline(n_games=1000, n_players=5, bonus_threshold=2, seed=None):
     """Run games with bonus_play_strategy and compute win rate.
 
     Args:
@@ -211,6 +213,53 @@ def _stats(arr):
     if not arr:
         return float("nan"), float("nan")
     return float(np.mean(arr)), float(np.median(arr))
+
+
+def evaluate_bc_only(bc_model_path, n_games=1000, n_players=5, seed=None):
+    """Evaluate BC-only model (before RL fine-tuning).
+
+    Args:
+        bc_model_path: Path to saved BC policy weights (.pt file).
+        n_games: Number of games to play.
+        n_players: Number of players.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Dict with win_rate, avg_cards.
+    """
+    env = TheGameEnv(n_players=n_players)
+    obs_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    bc_model = BCPolicyNetwork(obs_dim, action_dim)
+    bc_model.load_state_dict(torch.load(bc_model_path, weights_only=True))
+    bc_model.eval()
+
+    victories = 0
+    cards_per_game = []
+
+    for game_idx in range(n_games):
+        game_seed = seed + game_idx if seed is not None else None
+        obs, _ = env.reset(seed=game_seed)
+        terminated = False
+
+        while not terminated:
+            mask = env.action_masks()
+            with torch.no_grad():
+                obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+                mask_tensor = torch.tensor(mask, dtype=torch.bool).unsqueeze(0)
+                logits = bc_model(obs_tensor, mask_tensor)
+                action = logits.argmax(dim=1).item()
+            obs, _, terminated, _, info = env.step(action)
+
+        cards_per_game.append(env.total_cards_played)
+        if info.get("victory", False):
+            victories += 1
+
+    return {
+        "win_rate": victories / n_games,
+        "avg_cards": float(np.mean(cards_per_game)),
+    }
 
 
 def main():
@@ -248,6 +297,18 @@ def main():
         avg_cards = float(np.mean(eval_result["cards_per_game"]))
         results.append((name, win_rate, avg_cards))
         print(f"  Win rate: {win_rate:.1%}, Avg cards: {avg_cards:.1f}")
+
+    bc_path = bld_dir / "bc_policy.pt"
+    if bc_path.exists():
+        print("\nEvaluating BC-only (before RL fine-tuning)...")
+        bc_result = evaluate_bc_only(bc_path, n_games, n_players, seed)
+        results.append(("BC-only", bc_result["win_rate"], bc_result["avg_cards"]))
+        print(
+            f"  Win rate: {bc_result['win_rate']:.1%}, Avg cards: {bc_result['avg_cards']:.1f}"
+        )
+    else:
+        print(f"\n[SKIP] BC-only: model not found at {bc_path}")
+        results.append(("BC-only", None, None))
 
     print("\nEvaluating baseline (bonus_play_strategy)...")
     baseline_result = evaluate_baseline(

@@ -77,7 +77,7 @@ def draw_cards(hand, remaining_deck, hand_size=6):
     return new_hand, remaining_deck[cards_to_draw:]
 
 
-def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
+def run_game(strategy, n_players=5, n_shuffles=200, use_custom_shuffle=False):
     """Run an instance of the game with a given strategy.
 
     Args:
@@ -131,7 +131,7 @@ def run_game(strategy, n_players=3, n_shuffles=200, use_custom_shuffle=False):
 
 
 def run_simulation(
-    strategy, n_games=100, n_players=3, n_shuffles=200, use_custom_shuffle=False
+    strategy, n_games=100, n_players=5, n_shuffles=200, use_custom_shuffle=False
 ):
     """Run multiple games and collect data.
 
