@@ -287,7 +287,7 @@ def train_bc_then_rl(
     rl_timesteps: int = 1_000_000,
     n_players: int = 5,
     n_envs: int | None = None,
-    bonus_play_threshold: int = 4,
+    bonus_play_threshold: int = 2,
     demo_path: Path | str | None = None,
     bc_model_path: Path | str | None = None,
     output_path: Path | str | None = None,

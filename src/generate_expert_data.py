@@ -13,7 +13,7 @@ from game_env import TheGameEnv
 from utils import GameOverError, identify_min_distance_card
 
 
-def get_expert_action(env: TheGameEnv, bonus_play_threshold: int = 4) -> int:
+def get_expert_action(env: TheGameEnv, bonus_play_threshold: int = 2) -> int:
     """Compute expert action for current state using bonus_play_strategy logic.
 
     Args:
@@ -46,7 +46,7 @@ def get_expert_action(env: TheGameEnv, bonus_play_threshold: int = 4) -> int:
 def generate_expert_demonstrations(
     n_games: int = 10000,
     n_players: int = 5,
-    bonus_play_threshold: int = 4,
+    bonus_play_threshold: int = 2,
     output_path: Path | str | None = None,
     seed: int | None = None,
     verbose: bool = True,
@@ -155,7 +155,7 @@ def main():
     generate_expert_demonstrations(
         n_games=10000,
         n_players=5,
-        bonus_play_threshold=4,
+        bonus_play_threshold=2,
         output_path=output_path,
         seed=42,
         verbose=True,

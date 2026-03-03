@@ -68,13 +68,13 @@ def run_example_game(model, seed: int, n_players: int = 5, max_players: int = 3)
     step_num = 0
     turn_num = 0
     cards_this_turn = 0
-    current_player = 0
+    inner_env = env.unwrapped
+    current_player = inner_env.current_player_idx
 
     while True:
         step_num += 1
-        inner_env = env.unwrapped
 
-        hand = inner_env.hands[current_player].tolist()
+        hand = inner_env.hands[inner_env.current_player_idx].tolist()
         hand = [c for c in hand if c > 0]
         stacks = [
             inner_env.stacks[0].top,
@@ -106,7 +106,7 @@ def run_example_game(model, seed: int, n_players: int = 5, max_players: int = 3)
 
         if action == 24:
             cards_this_turn = 0
-            current_player = (current_player + 1) % n_players
+            current_player = inner_env.current_player_idx
         else:
             cards_this_turn += 1
 
@@ -168,7 +168,7 @@ def generate_example_games(
     lines = [
         f"# Example Games: {Path(model_path).stem}",
         "",
-        f"Generated from model: `{model_path}`",
+        f"Generated from model: `{Path(model_path).name}`",
         "",
         f"Configuration: {n_players} players, {n_games} games",
         "",
