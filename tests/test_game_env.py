@@ -229,8 +229,6 @@ class TestRewardStructure:
             reward_per_card=0.5,
             trick_play_reward=0,
             distance_penalty_scale=0,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
         mask = env.action_masks()
@@ -257,8 +255,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0.1,
             distance_penalty_scale=0,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -278,8 +274,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0.1,
             distance_penalty_scale=0,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -299,8 +293,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0,
             distance_penalty_scale=0.01,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -321,8 +313,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0,
             distance_penalty_scale=0.01,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -343,8 +333,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0,
             distance_penalty_scale=0.001,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -365,8 +353,6 @@ class TestRewardStructure:
             reward_per_card=0.01,
             trick_play_reward=0.1,
             distance_penalty_scale=0,
-            stack_health_scale=0,
-            phase_multiplier_scale=0,
         )
         env.reset(seed=42)
 
@@ -378,60 +364,6 @@ class TestRewardStructure:
         assert not terminated
         # Not a backwards trick (40 > 30, normal forward play on increasing stack)
         assert reward == pytest.approx(0.01, abs=0.001)
-
-    def test_stack_health_reward(self):
-        """Balanced stack usage gives bonus reward."""
-        from utils import Stack
-
-        env = TheGameEnv(
-            reward_per_card=0.0,
-            trick_play_reward=0.0,
-            distance_penalty_scale=0.0,
-            stack_health_scale=0.1,
-            phase_multiplier_scale=0.0,
-        )
-        env.reset(seed=42)
-
-        # Set up balanced stacks (all at similar gaps)
-        env.stacks[0] = Stack.from_array([99, 50])  # gap = 48/97 ~ 0.495
-        env.stacks[1] = Stack.from_array([99, 50])  # gap = 48/97 ~ 0.495
-        env.stacks[2] = Stack.from_array([1, 50])  # gap = 49/98 = 0.5
-        env.stacks[3] = Stack.from_array([1, 50])  # gap = 49/98 = 0.5
-        env.hands[0] = np.array([40, 45, 55, 60, 65, 70], dtype=np.int32)
-
-        action = 0 * 4 + 0  # Play 40 on decreasing stack
-        _, reward, terminated, _, _ = env.step(action)
-        assert not terminated
-        # Low variance -> bonus close to 0.1
-        assert reward > 0.09
-
-    def test_phase_multiplier_reward(self):
-        """Late game rewards are multiplied."""
-        env = TheGameEnv(
-            reward_per_card=0.1,
-            trick_play_reward=0.0,
-            distance_penalty_scale=0.0,
-            stack_health_scale=0.0,
-            phase_multiplier_scale=0.5,
-        )
-        env.reset(seed=42)
-
-        # At start, phase = 0, multiplier = 1.0
-        env.total_cards_played = 0
-        mask = env.action_masks()
-        action = np.where(mask)[0][0]
-        _, reward_early, _, _, _ = env.step(action)
-
-        env.reset(seed=42)
-        # Simulate late game
-        env.total_cards_played = 90
-        mask = env.action_masks()
-        action = np.where(mask)[0][0]
-        _, reward_late, _, _, _ = env.step(action)
-
-        # Late game should have higher reward due to phase multiplier
-        # phase = 91/98 ~ 0.93, multiplier ~ 1.465
-        assert reward_late > reward_early
 
 
 class TestMultiPlayer:

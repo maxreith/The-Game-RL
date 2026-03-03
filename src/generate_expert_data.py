@@ -72,9 +72,6 @@ def generate_expert_demonstrations(
         loss_penalty=0.0,
         trick_play_reward=1.0,
         distance_penalty_scale=0.003,
-        progress_reward_scale=3.0,
-        stack_health_scale=0.01,
-        phase_multiplier_scale=0.5,
     )
 
     observations = []

@@ -24,9 +24,6 @@ SPARSE_REWARDS = dict(
     loss_penalty=0.5,
     trick_play_reward=0.0,
     distance_penalty_scale=0.0,
-    progress_reward_scale=0.0,
-    stack_health_scale=0.0,
-    phase_multiplier_scale=0.0,
 )
 
 SHAPED_REWARDS = dict(
@@ -35,9 +32,6 @@ SHAPED_REWARDS = dict(
     loss_penalty=0.5,
     trick_play_reward=1.0,
     distance_penalty_scale=0.003,
-    progress_reward_scale=0.0,
-    stack_health_scale=0.0,
-    phase_multiplier_scale=0.0,
 )
 
 

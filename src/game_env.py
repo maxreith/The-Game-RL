@@ -27,9 +27,6 @@ class TheGameEnv(gym.Env):
         loss_penalty: Penalty for losing the game.
         trick_play_reward: Bonus for backwards trick plays (±10 reset cards).
         distance_penalty_scale: Scale for distance-based reward shaping.
-        progress_reward_scale: Scale for progress bonus on loss.
-        stack_health_scale: Scale for balanced stack usage reward.
-        phase_multiplier_scale: Scale for late-game reward amplification.
     """
 
     metadata = {"render_modes": ["human"]}
@@ -44,9 +41,6 @@ class TheGameEnv(gym.Env):
         loss_penalty=0.5,
         trick_play_reward=0.1,
         distance_penalty_scale=0.001,
-        progress_reward_scale=0.0,
-        stack_health_scale=0.01,
-        phase_multiplier_scale=0.5,
     ):
         super().__init__()
         self.n_players = n_players
@@ -57,9 +51,6 @@ class TheGameEnv(gym.Env):
         self.loss_penalty = loss_penalty
         self.trick_play_reward = trick_play_reward
         self.distance_penalty_scale = distance_penalty_scale
-        self.progress_reward_scale = progress_reward_scale
-        self.stack_health_scale = stack_health_scale
-        self.phase_multiplier_scale = phase_multiplier_scale
 
         # Action: card_index * 4 + stack_index, plus one "end turn" action
         # card_index in [0, hand_size-1], stack_index in [0, 3]
@@ -310,12 +301,9 @@ class TheGameEnv(gym.Env):
             if not np.any(self.action_masks()):
                 info = {"victory": False, "reason": "next_player_stuck"}
                 info.update(self._get_episode_stats())
-                progress_bonus = self.progress_reward_scale * (
-                    self.total_cards_played / 98
-                )
                 return (
                     self._get_observation(),
-                    -self.loss_penalty + progress_bonus,
+                    -self.loss_penalty,
                     True,
                     False,
                     info,
@@ -372,23 +360,6 @@ class TheGameEnv(gym.Env):
         if distance > 5:
             reward -= self.distance_penalty_scale * (distance - 5) ** 2
 
-        # Stack health reward: bonus for balanced stack usage (low gap variance)
-        if self.stack_health_scale > 0:
-            gaps = [
-                (self.stacks[0].top - 2) / 97.0,
-                (self.stacks[1].top - 2) / 97.0,
-                (99 - self.stacks[2].top) / 98.0,
-                (99 - self.stacks[3].top) / 98.0,
-            ]
-            gap_variance = np.var(gaps)
-            reward += self.stack_health_scale * (1.0 - gap_variance)
-
-        # Game phase multiplier: rewards increase late game
-        if self.phase_multiplier_scale > 0:
-            game_phase = self.total_cards_played / 98.0
-            phase_multiplier = 1.0 + self.phase_multiplier_scale * game_phase
-            reward *= phase_multiplier
-
         # Check for victory
         total_cards = len(self.remaining_deck) + sum(len(h) for h in self.hands)
         if total_cards == 0:
@@ -411,12 +382,9 @@ class TheGameEnv(gym.Env):
             if self.cards_played_this_turn < self._min_cards_required():
                 info = {"victory": False, "reason": "cannot_play_minimum"}
                 info.update(self._get_episode_stats())
-                progress_bonus = self.progress_reward_scale * (
-                    self.total_cards_played / 98
-                )
                 return (
                     self._get_observation(),
-                    reward - self.loss_penalty + progress_bonus,
+                    reward - self.loss_penalty,
                     True,
                     False,
                     info,
@@ -427,12 +395,9 @@ class TheGameEnv(gym.Env):
             if not np.any(self.action_masks()):
                 info = {"victory": False, "reason": "next_player_stuck"}
                 info.update(self._get_episode_stats())
-                progress_bonus = self.progress_reward_scale * (
-                    self.total_cards_played / 98
-                )
                 return (
                     self._get_observation(),
-                    reward - self.loss_penalty + progress_bonus,
+                    reward - self.loss_penalty,
                     True,
                     False,
                     info,
