@@ -21,7 +21,7 @@ You **must** play at least **2 cards** from your hand onto any of the four piles
 **Step B: Draw Cards**
 Once you finish playing, draw back up to your original hand size.
 
-### 3. The "Backwards" Rule (The Secret to Winning)
+### 3. The "Backwards" Rule
 Normally, you must follow the direction of the pile. However, there is one exception that allows you to "reset" a pile:
 *   You may play a card in the **wrong direction** if it is **exactly 10 higher or lower** than the top card.
 *   *Example:* If the Ascending pile is at **45**, you can play the **35** on top of it to "push" the pile back down, giving your team more room to play.

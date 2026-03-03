@@ -1,8 +1,7 @@
 # The Game Simulation
 
-A Monte Carlo simulation framework for analyzing strategies in
-[The Game](https://boardgamegeek.com/boardgame/173090/the-game), a cooperative card game
-where players work together to play all 98 cards onto four shared stacks.
+Training RL agents on [The Game](https://boardgamegeek.com/boardgame/173090/the-game), a
+cooperative card game where players work together to play cards onto four shared stacks.
 
 ## The Game Rules
 
@@ -13,22 +12,48 @@ where players work together to play all 98 cards onto four shared stacks.
 - Each turn: play at least 2 cards (or 1 if deck is empty), then draw back to hand size
 - Win condition: all cards played; lose condition: cannot make a legal play
 
-## Analysis
+## Training Agents
 
-### Which strategy works best? And what is the optimal number of players?
+I use gymnasium and sblines3 for training. Masked PPO.
 
-The simulation tests a "bonus play" strategy that plays additional cards beyond the
-minimum required when a card is within a threshold distance from a stack top. Lower
-thresholds mean more aggressive extra plays. I ran 10,000 simulations for each
-combination of player count and bonus play threshold.
+`Game_env.py` defines the environment. Agents' observation space includes own hand,
+stack tops, the number of cards remaining in the deck, how many cards the agents has
+left to play this turn and how many he has played already, total progress. Importantly,
+an agent does not get to see the other agents' hands, as that would be against the
+rules!
+
+Agents are trained from an individual perspective, but they are rewarded for collective
+outcomes.
+
+I employ two ways to train agents. I train agents on games with n players.
+
+1. Simply training an agent
+
+Explain reward structure.
+
+Then show training results. My hypothesis is that training will not go well.
+
+2. BC + RL
+
+For this, I first coded up an expert system called bonus_play_strategy, saved in
+strategies.py. It's a pretty simple system: it always plays the card with the minimum
+distance to the current stack tops until it reached the minimum number of cards to play,
+and only plays additional cards if the distance is below a bonus_play threshold.
+
+The expert is able to get decent winrates of up to 5% on the game. I ran 10,000
+simulations for each combination of player count and bonus play threshold.
 
 ![Strategy Evaluation](bld/strategy_evaluation.png)
 
-**Findings:**
+The highest winrate across all combinations is achieved in a 5 player game, with a
+threshold of 2 - 3. #TODO: Specify which one it is.
 
-- Threshold 2 or 3 performs best across most player counts
-- Win rates peak at only 5 percent
-- 5 players seems optimal
+The way the reinforcement learning agent is trained here is to first 'clone' the expert
+system into a neural network, and then finetune the neural network using RL.
+
+Show training results of BC + RL agent.
+
+## Further Analysis
 
 ### Does it matter how well the deck is shuffled?
 
@@ -65,7 +90,7 @@ games per thinking level (because compute is not free, and high thinking is slow
 pixi install
 ```
 
-## Usage
+## Usage #TODO: SHould I get rid of pytask?
 
 Run all simulations:
 
@@ -87,7 +112,7 @@ Generate plots from existing results:
 pixi run python src/generate_plots.py
 ```
 
-## Project Structure
+## Project Structure #TO-DO: Update
 
 ```
 src/
