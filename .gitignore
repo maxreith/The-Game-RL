@@ -12,7 +12,14 @@ __pycache__/
 .ruff_cache/
 
 # Build outputs
-bld/
+bld/*
+!bld/*.png
+!bld/bc_rl_500M_final.zip
+!bld/shaped_100M_final.zip
+!bld/sparse_100M_final.zip
+!bld/bc_rl_checkpoints/
+bld/bc_rl_checkpoints/*
+!bld/bc_rl_checkpoints/bc_rl_100000000_steps.zip
 *.parquet
 
 # Other
