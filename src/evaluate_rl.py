@@ -1,8 +1,5 @@
 """Evaluate trained RL agent against baseline strategies."""
 
-import json
-import re
-from datetime import date
 from functools import partial
 from pathlib import Path
 
@@ -14,7 +11,7 @@ from game_setup import run_simulation
 from strategies import bonus_play_strategy
 
 
-def evaluate_rl_agent(model, n_games=1000, n_players=3, seed=None):
+def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
     """Run games with RL agent and compute win rate and extended statistics.
 
     Args:
@@ -216,242 +213,64 @@ def _stats(arr):
     return float(np.mean(arr)), float(np.median(arr))
 
 
-def extract_step_count(filename: str) -> int | None:
-    """Extract training step count from checkpoint filename.
-
-    Args:
-        filename: Checkpoint filename like 'bc_rl_1000000_steps.zip'.
-
-    Returns:
-        Step count as integer, or None if pattern doesn't match.
-    """
-    match = re.search(r"_(\d+)_steps\.zip$", filename)
-    if match:
-        return int(match.group(1))
-    return None
-
-
-def evaluate_checkpoints(
-    checkpoint_dir: Path,
-    n_games: int = 1000,
-    n_players: int = 5,
-    seed: int = 42,
-    verbose: bool = True,
-) -> list[dict]:
-    """Evaluate all checkpoints in a directory.
-
-    Args:
-        checkpoint_dir: Directory containing checkpoint .zip files.
-        n_games: Number of games per checkpoint evaluation.
-        n_players: Number of players per game.
-        seed: Random seed for reproducibility.
-        verbose: Whether to print progress.
-
-    Returns:
-        List of dicts with training_steps, win_rate, avg_cards_per_game, etc.
-    """
-    checkpoint_dir = Path(checkpoint_dir)
-    checkpoints = sorted(checkpoint_dir.glob("*_steps.zip"))
-
-    if not checkpoints:
-        if verbose:
-            print(f"No checkpoints found in {checkpoint_dir}")
-        return []
-
-    results = []
-    for ckpt_path in checkpoints:
-        step_count = extract_step_count(ckpt_path.name)
-        if step_count is None:
-            if verbose:
-                print(f"Skipping {ckpt_path.name}: could not parse step count")
-            continue
-
-        if verbose:
-            print(f"Evaluating checkpoint at {step_count:,} steps...")
-
-        model = MaskablePPO.load(ckpt_path)
-        eval_results = evaluate_rl_agent(model, n_games, n_players, seed)
-
-        avg_cards = float(np.mean(eval_results["cards_per_game"]))
-        results.append(
-            {
-                "training_steps": step_count,
-                "win_rate": eval_results["win_rate"],
-                "avg_cards_per_game": avg_cards,
-                "victories": eval_results["victories"],
-                "losses": eval_results["losses"],
-            }
-        )
-
-        if verbose:
-            print(
-                f"  Win rate: {eval_results['win_rate']:.1%}, "
-                f"Avg cards: {avg_cards:.1f}"
-            )
-
-    results.sort(key=lambda x: x["training_steps"])
-    return results
-
-
-def save_results_json(
-    results: list[dict],
-    output_path: Path,
-    model_type: str,
-    n_players: int,
-    n_games: int,
-):
-    """Save evaluation results to JSON file.
-
-    Args:
-        results: List of checkpoint evaluation results.
-        output_path: Path to output JSON file.
-        model_type: Type of model (e.g., 'rl' or 'bc_rl').
-        n_players: Number of players per game.
-        n_games: Number of games per checkpoint evaluation.
-    """
-    output = {
-        "model_type": model_type,
-        "n_players": n_players,
-        "n_games": n_games,
-        "evaluated_at": str(date.today()),
-        "checkpoints": results,
-    }
-
-    output_path = Path(output_path)
-    output_path.parent.mkdir(exist_ok=True)
-    with open(output_path, "w") as f:
-        json.dump(output, f, indent=2)
-
-
-def evaluate_all_checkpoints(
-    rl_checkpoint_dir: Path | str | None = None,
-    bc_rl_checkpoint_dir: Path | str | None = None,
-    n_games: int = 1000,
-    n_players: int = 5,
-    seed: int = 42,
-    verbose: bool = True,
-):
-    """Evaluate all checkpoints for both RL and BC+RL models.
-
-    Args:
-        rl_checkpoint_dir: Directory with pure RL checkpoints.
-        bc_rl_checkpoint_dir: Directory with BC+RL checkpoints.
-        n_games: Number of games per checkpoint evaluation.
-        n_players: Number of players per game.
-        seed: Random seed for reproducibility.
-        verbose: Whether to print progress.
-    """
+def main():
+    """Evaluate 4 models and compare against baseline."""
     bld_dir = Path(__file__).parent.parent / "bld"
 
-    if rl_checkpoint_dir is None:
-        rl_checkpoint_dir = bld_dir / "rl_checkpoints"
-    else:
-        rl_checkpoint_dir = Path(rl_checkpoint_dir)
-
-    if bc_rl_checkpoint_dir is None:
-        bc_rl_checkpoint_dir = bld_dir / "bc_rl_checkpoints"
-    else:
-        bc_rl_checkpoint_dir = Path(bc_rl_checkpoint_dir)
-
-    if rl_checkpoint_dir.exists():
-        if verbose:
-            print("=" * 60)
-            print("Evaluating Pure RL Checkpoints")
-            print("=" * 60)
-        rl_results = evaluate_checkpoints(
-            rl_checkpoint_dir, n_games, n_players, seed, verbose
-        )
-        if rl_results:
-            output_path = bld_dir / "rl_evaluation_results.json"
-            save_results_json(rl_results, output_path, "rl", n_players, n_games)
-            if verbose:
-                print(f"\nSaved results to {output_path}")
-    else:
-        if verbose:
-            print(f"RL checkpoint directory not found: {rl_checkpoint_dir}")
-
-    if bc_rl_checkpoint_dir.exists():
-        if verbose:
-            print("\n" + "=" * 60)
-            print("Evaluating BC+RL Checkpoints")
-            print("=" * 60)
-        bc_rl_results = evaluate_checkpoints(
-            bc_rl_checkpoint_dir, n_games, n_players, seed, verbose
-        )
-        if bc_rl_results:
-            output_path = bld_dir / "bc_rl_evaluation_results.json"
-            save_results_json(bc_rl_results, output_path, "bc_rl", n_players, n_games)
-            if verbose:
-                print(f"\nSaved results to {output_path}")
-    else:
-        if verbose:
-            print(f"BC+RL checkpoint directory not found: {bc_rl_checkpoint_dir}")
-
-
-def main():
-    """Compare RL agent against baseline strategy."""
-    model_path = Path(__file__).parent.parent / "bld" / "the_game_ppo.zip"
-
-    if not model_path.exists():
-        print(f"Model not found at {model_path}")
-        print("Run train_rl.py first to train the model.")
-        return
-
-    print("Loading trained RL model...")
-    model = MaskablePPO.load(model_path)
+    models = [
+        ("Pure RL (sparse) @ 100M", bld_dir / "sparse_100M_final.zip"),
+        ("Pure RL (shaped) @ 100M", bld_dir / "shaped_100M_final.zip"),
+        ("BC+RL @ 100M", bld_dir / "bc_rl_checkpoints" / "bc_rl_100000000_steps.zip"),
+        ("BC+RL @ 500M", bld_dir / "bc_rl_500M_final.zip"),
+    ]
 
     n_games = 1000
-    n_players = 3
+    n_players = 5
     seed = 42
 
-    print(f"\nEvaluating on {n_games} games with {n_players} players...\n")
+    print(
+        f"Evaluating models ({n_games} games, {n_players} players, seed={seed})\n"
+    )  # TODO: remove the print statements and save in a file instead
+    print("=" * 60)
 
-    print("Running RL agent...")
-    rl_results = evaluate_rl_agent(model, n_games, n_players, seed)
+    results = []
 
-    avg_cpg, med_cpg = _stats(rl_results["cards_per_game"])
-    avg_cpt, med_cpt = _stats(rl_results["cards_per_turn"])
-    avg_dist, med_dist = _stats(rl_results["distances"])
-    avg_tp, med_tp = _stats(rl_results["trick_plays_per_game"])
+    for name, path in models:
+        if not path.exists():
+            print(f"[SKIP] {name}: checkpoint not found at {path}")
+            results.append((name, None, None))
+            continue
 
-    print(f"  Win rate:                    {rl_results['win_rate'] * 100:.1f}%")
-    print(f"  Cards played / game  — avg: {avg_cpg:.1f},  median: {med_cpg:.1f}")
-    print(f"  Cards played / turn  — avg: {avg_cpt:.1f},  median: {med_cpt:.1f}")
-    print(f"  Distance per card    — avg: {avg_dist:.1f},  median: {med_dist:.1f}")
-    print(f"  Trick plays / game   — avg: {avg_tp:.1f},  median: {med_tp:.1f}")
+        print(f"Evaluating {name}...")
+        model = MaskablePPO.load(path)
+        eval_result = evaluate_rl_agent(model, n_games, n_players, seed)
+        win_rate = eval_result["win_rate"]
+        avg_cards = float(np.mean(eval_result["cards_per_game"]))
+        results.append((name, win_rate, avg_cards))
+        print(f"  Win rate: {win_rate:.1%}, Avg cards: {avg_cards:.1f}")
 
-    print("\nRunning bonus_play_strategy (threshold=2)...")
-    baseline_results = evaluate_baseline(
+    print("\nEvaluating baseline (bonus_play_strategy)...")
+    baseline_result = evaluate_baseline(
         n_games, n_players, bonus_threshold=2, seed=seed
     )
-    print(f"  Win rate: {baseline_results['win_rate'] * 100:.1f}%")
+    baseline_win_rate = baseline_result["win_rate"]
+    results.append(("Baseline (bonus_play)", baseline_win_rate, None))
+    print(f"  Win rate: {baseline_win_rate:.1%}")
 
-    print("\n" + "=" * 40)
-    print("COMPARISON")
-    print("=" * 40)
-    diff = (rl_results["win_rate"] - baseline_results["win_rate"]) * 100
-    print(f"RL Agent:     {rl_results['win_rate'] * 100:5.1f}%")
-    print(f"Baseline:     {baseline_results['win_rate'] * 100:5.1f}%")
-    print(f"Difference:   {diff:+5.1f}%")
-
-    if diff > 0:
-        print("\nRL agent outperforms baseline!")
-    elif diff < 0:
-        print("\nBaseline outperforms RL agent.")
-    else:
-        print("\nPerformance is equal.")
-
-    # Print a randomly sampled game in full detail
-    rng = np.random.default_rng(seed)
-    sample_seed = int(rng.integers(0, 10_000))
-    print(f"\nSampling a single game (seed={sample_seed}) for detailed inspection...")
-    replay_single_game(model, n_players=n_players, seed=sample_seed, verbose=True)
+    print("\n" + "=" * 60)
+    print("COMPARISON TABLE")
+    print("=" * 60)
+    print(f"{'Model':<30} {'Win Rate':>10} {'Avg Cards':>12}")
+    print("-" * 54)
+    for name, win_rate, avg_cards in results:
+        if win_rate is None:
+            print(f"{name:<30} {'N/A':>10} {'N/A':>12}")
+        elif avg_cards is None:
+            print(f"{name:<30} {win_rate:>9.1%} {'N/A':>12}")
+        else:
+            print(f"{name:<30} {win_rate:>9.1%} {avg_cards:>11.1f}")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1 and sys.argv[1] == "--checkpoints":
-        evaluate_all_checkpoints()
-    else:
-        main()
+    main()
