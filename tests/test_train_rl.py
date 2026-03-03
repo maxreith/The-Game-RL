@@ -33,22 +33,22 @@ class TestTrain:
     def test_short_training_runs(self):
         """Short training completes without errors."""
         model = train(
+            variant="sparse",
             total_timesteps=100,
             n_players=3,
             n_envs=1,
             verbose=0,
-            tensorboard_log=False,
         )
         assert model is not None
 
     def test_model_can_predict(self):
         """Trained model can make predictions."""
         model = train(
+            variant="sparse",
             total_timesteps=100,
             n_players=3,
             n_envs=1,
             verbose=0,
-            tensorboard_log=False,
         )
         env = create_env(n_players=3, n_envs=1)
         obs = env.reset()

@@ -2,7 +2,11 @@
 
 Two-phase approach:
 1. Pre-train neural network to imitate bonus_play_strategy via supervised learning
-2. Initialize MaskablePPO with BC weights and continue training with RL
+2. Initialize MaskablePPO with BC weights and fine-tune with RL to 500M steps
+
+Outputs:
+- bld/bc_rl_checkpoints/bc_rl_*_steps.zip (checkpoints every 10M steps)
+- bld/bc_rl_500M_final.zip (final model)
 """
 
 import os
@@ -22,6 +26,7 @@ from generate_expert_data import (
 )
 from train_rl import (
     GameMetricsCallback,
+    SPARSE_REWARDS,
     create_env,
 )
 
@@ -327,7 +332,7 @@ def train_bc_then_rl(
         bc_model_path = Path(bc_model_path)
 
     if output_path is None:
-        output_path = bld_dir / "the_game_bc_rl"
+        output_path = bld_dir / "bc_rl_500M_final.zip"
     else:
         output_path = Path(output_path)
 
@@ -394,7 +399,12 @@ def train_bc_then_rl(
     monitor_dir = str(bld_dir / "bc_rl_monitor")
     Path(monitor_dir).mkdir(exist_ok=True)
 
-    env = create_env(n_players=n_players, n_envs=n_envs, log_dir=monitor_dir)
+    env = create_env(
+        n_players=n_players,
+        reward_config=SPARSE_REWARDS,
+        n_envs=n_envs,
+        log_dir=monitor_dir,
+    )
 
     policy_kwargs = dict(
         net_arch=dict(pi=[256, 256], vf=[256, 256]),
@@ -428,8 +438,8 @@ def train_bc_then_rl(
         print(f"Training for {rl_timesteps:,} timesteps with {n_envs} parallel envs")
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=1_000_000 // n_envs,
-        save_path="bld/bc_rl_checkpoints",
+        save_freq=10_000_000 // n_envs,
+        save_path=str(bld_dir / "bc_rl_checkpoints"),
         name_prefix="bc_rl",
         save_replay_buffer=False,
         save_vecnormalize=False,
@@ -449,7 +459,7 @@ def main():
     train_bc_then_rl(
         n_demo_games=10000,
         bc_epochs=100,
-        rl_timesteps=20_000_000,
+        rl_timesteps=500_000_000,
         n_players=5,
         verbose=1,
     )
