@@ -16,7 +16,7 @@ bld/*
 !bld/strategy_evaluation.png
 !bld/shuffle_evaluation.png
 !bld/gemini_thinking.png
-!bld/bc_rl_500M_final.zip
+!bld/bc_rl_100M_final.zip
 !bld/shaped_100M_final.zip
 !bld/sparse_100M_final.zip
 !bld/bc_rl_checkpoints/
