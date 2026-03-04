@@ -14,7 +14,7 @@ from train_bc_rl import BCPolicyNetwork
 
 
 def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
-    """Run games with RL agent and compute win rate and extended statistics.
+    """Run games with RL agent and compute win rate and statistics.
 
     Args:
         model: Trained MaskablePPO model.
@@ -23,68 +23,38 @@ def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
         seed: Random seed for reproducibility.
 
     Returns:
-        Dict with win_rate, victories, losses, cards_per_game, cards_per_turn,
-        distances, trick_plays_per_game.
+        Dict with win_rate, victories, losses, cards_per_game, cards_per_turn.
     """
     env = TheGameEnv(n_players=n_players)
     victories = 0
     cards_per_game = []
     cards_per_turn_all = []
-    distances_all = []
-    trick_plays_per_game = []
 
     for game_idx in range(n_games):
         game_seed = seed + game_idx if seed is not None else None
         obs, info = env.reset(seed=game_seed)
         terminated = False
-
-        game_distances = []
-        game_trick_plays = 0
         cards_this_turn = 0
 
         while not terminated:
             action_mask = env.action_masks()
-
-            # Snapshot piles before step to compute distance & trick plays
-            state = env.game.state if hasattr(env, "game") else None
-            piles_before = [p.top for p in state.piles] if state is not None else None
-
             action, _ = model.predict(obs, deterministic=True, action_masks=action_mask)
             obs, reward, terminated, truncated, info = env.step(action)
 
-            # Detect end-of-turn action (pass) vs card play
-            # action 0 is typically "pass/end turn" in TheGameEnv
             is_pass = action == 0
-
             if not is_pass:
                 cards_this_turn += 1
-
-                # Compute distance if we have pile info
-                if piles_before is not None and state is not None:
-                    piles_after = [p.top for p in state.piles]
-                    for before, after in zip(piles_before, piles_after):
-                        if before != after:
-                            dist = abs(after - before)
-                            game_distances.append(dist)
-                            # Trick play: moving backward by exactly 10
-                            # Ascending pile trick: after == before - 10
-                            # Descending pile trick: after == before + 10
-                            if dist == 10:
-                                game_trick_plays += 1
             else:
                 if cards_this_turn > 0:
                     cards_per_turn_all.append(cards_this_turn)
                 cards_this_turn = 0
 
-        # Flush last turn if game ended mid-turn
         if cards_this_turn > 0:
             cards_per_turn_all.append(cards_this_turn)
 
         if info.get("victory", False):
             victories += 1
         cards_per_game.append(env.total_cards_played)
-        distances_all.extend(game_distances)
-        trick_plays_per_game.append(game_trick_plays)
 
     return {
         "win_rate": victories / n_games,
@@ -92,8 +62,6 @@ def evaluate_rl_agent(model, n_games=1000, n_players=5, seed=None):
         "losses": n_games - victories,
         "cards_per_game": cards_per_game,
         "cards_per_turn": cards_per_turn_all,
-        "distances": distances_all,
-        "trick_plays_per_game": trick_plays_per_game,
     }
 
 
