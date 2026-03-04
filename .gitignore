@@ -1,6 +1,9 @@
 # pixi environments
 .pixi/
 
+# pytask cache
+.pytask/
+
 # Python bytecode
 __pycache__/
 *.pyc
