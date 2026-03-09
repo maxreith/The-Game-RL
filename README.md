@@ -15,7 +15,10 @@ I play this game with my mates a lot, so I had to do this.
 
 ## Training Agents
 
-I train RL agents using masked proximal policy optimization (PPO).
+I train RL agents using masked proximal policy optimization (PPO). See Chapter 5 of
+[Francois-Lavet et al. (2018)](https://doi.org/10.1561/2200000071) for a quick treatment
+on PPO and [Huang & Ontañón (2020)](https://doi.org/10.32473/flairs.v35i.130584) for
+invalid action masking.
 
 PPO methods use actor-critic architecture, where the actor refers to the policy
 $\\pi(a|s) \\rightarrow [0,1]$, the probability of taking action $a$ in state $s$, and
@@ -142,10 +145,8 @@ RL with shaped rewards!
 ### Does it matter how well the deck is shuffled?
 
 My mates and I keep disagreeing over how much to shuffle the deck before setting up a
-new game. Well, how does shuffling affect win rates? Using a custom cut-based shuffle
-algorithm, different shuffle qualities at 1000 games each, using the simple expert
-system (`bonus_play_strategy`) with optimal settings (5 players, bonus play threshold of
-2).
+new game. Well, how does shuffling affect win rates? I use a custom cut-based shuffle
+algorithm, different shuffle qualities at 1000 games each and games with 5 players.
 
 ![Shuffle Quality Evaluation](bld/shuffle_evaluation.png)
 
